@@ -49,7 +49,7 @@ export function normalizeInput(input) {
 }
 
 // Fuzzy find using Fuse.js: returns up to `limit` matching food items
-export function fuzzyFind(foodList, input, limit = 5) {
+export function fuzzyFind(foodList, input, limit = 5, tokenScoreThreshold = 0.4) {
   const normalizedInput = normalizeInput(input);
   if (!normalizedInput || !foodList || normalizedInput.length < 2) return [];
 
@@ -71,7 +71,15 @@ export function fuzzyFind(foodList, input, limit = 5) {
     minMatchCharLength: 2,
   });
 
-  const results = fuse.search(normalizedInput);
+  const tokens = normalizedInput.split(/\s+/).filter(Boolean);
+  const filteredTokens = tokens.filter((t) => {
+    const res = fuse.search(t);
+    const top = res.length ? res[0].score : 1;
+    return top <= tokenScoreThreshold;
+  });
+  const searchQuery = filteredTokens.length ? filteredTokens.join(" ") : normalizedInput;
+
+  const results = fuse.search(searchQuery);
   if (process.env.NODE_ENV !== "production" && results.length) {
     console.debug(
       "Top matches:",
