@@ -4,53 +4,11 @@ import { useEffect, useState, useRef } from "react";
 import debounce from "lodash.debounce";
 import { extractAmount, fuzzyFind } from "@/app/home/analyzer";
 
-
 export default function FoodNLPPage() {
   const [foodList, setFoodList] = useState([]);
-  const [input, setInput] = useState("");
-  const [result, setResult] = useState(null);
-  const [amount, setAmount] = useState(100);
+  const [lines, setLines] = useState([{ text: "", selected: null, done: false }]);
+  const [activeIndex, setActiveIndex] = useState(0);
   const [suggestions, setSuggestions] = useState([]);
-
-  // YENİ: foodList her değiştiğinde yeni debounce oluşturmak için ref ve useEffect kullanıyoruz
-  const analyzeInput = (val) => {
-    const matches = fuzzyFind(foodList, val);
-    setSuggestions(matches);
-    const portion = matches && matches.length ? matches[0].portion : 100;
-    const amt = extractAmount(val, portion);
-    setAmount(amt);
-    if (matches && matches.length) {
-      setResult(matches[0]);
-    } else {
-      setResult(null);
-    }
-  };
-
-  const debouncedAnalyze = useRef();
-  useEffect(() => {
-    debouncedAnalyze.current = debounce(analyzeInput, 400);
-    // Temizlik
-    return () => debouncedAnalyze.current.cancel();
-  }, [foodList]); // foodList değiştikçe yeni debounce oluştur
-
-  function handleInputChange(e) {
-    const val = e.target.value;
-    setInput(val);
-    if (debouncedAnalyze.current)
-      debouncedAnalyze.current(val); // sadece value geç, foodList zaten closure'da güncel
-  }
-  function handleKeyDown(e) {
-    if (e.key === "Enter") {
-      if (debouncedAnalyze.current) debouncedAnalyze.current.cancel();
-      analyzeInput(e.target.value); // direkt analiz
-    }
-  }
-
-  function handleSelect(item) {
-    setResult(item);
-    setInput(item.name);
-    setSuggestions([]);
-  }
 
   // Fetch food list on mount
   useEffect(() => {
@@ -60,83 +18,125 @@ export default function FoodNLPPage() {
       .then((data) => setFoodList(data));
   }, []);
 
-  //EXAMPLE foodList FORMAT
-/*
-  {
-    "dana beyin (pismis)": {
-    "name": "Dana Beyin (Pişmiş)",
-        "calorie": 127,
-        "protein": 10.67,
-        "carb": 0.99,
-        "fat": 8.96,
-        "fiber": 0.0,
-        "portion": 125.0
-  },
-    "nachos": {
-    "name": "Nachos",
-        "calorie": 317,
-        "protein": 5.21,
-        "carb": 41.76,
-        "fat": 14.47,
-        "fiber": 3.41,
-        "portion": 81.0
-  },
-    "tadim ceviz i̇ci": {
-    "name": "Tadım Ceviz İçi",
-        "calorie": 600,
-        "protein": 16.5,
-        "carb": 8.0,
-        "fat": 55.8,
-        "fiber": 14.4,
-        "portion": 80.0
-  },
-*/
+  const analyzeInput = (val) => {
+    const matches = fuzzyFind(foodList, val);
+    setSuggestions(matches);
+  };
+
+  const debouncedAnalyze = useRef();
+  useEffect(() => {
+    debouncedAnalyze.current = debounce(analyzeInput, 400);
+    return () => debouncedAnalyze.current.cancel();
+  }, [foodList]);
+
+  function handleChange(index, val) {
+    setLines((prev) => {
+      const arr = [...prev];
+      arr[index].text = val;
+      arr[index].selected = null;
+      return arr;
+    });
+    setActiveIndex(index);
+    if (debouncedAnalyze.current) debouncedAnalyze.current(val);
+  }
+
+  function handleSelect(item) {
+    setLines((prev) => {
+      const arr = [...prev];
+      arr[activeIndex].text = item.name;
+      arr[activeIndex].selected = item;
+      return arr;
+    });
+    setSuggestions([]);
+  }
+
+  function finalizeLine(index) {
+    const line = lines[index];
+    const matches = fuzzyFind(foodList, line.text);
+    const food = line.selected || (matches && matches[0]);
+    if (!food) return;
+    const amt = extractAmount(line.text, food.portion);
+    const text = `${food.name} - ${amt} g`;
+    setLines((prev) => {
+      const arr = [...prev];
+      arr[index] = { text, selected: food, amount: amt, done: true };
+      if (index === prev.length - 1) arr.push({ text: "", selected: null, done: false });
+      return arr;
+    });
+    setActiveIndex(index + 1);
+    setSuggestions([]);
+  }
+
+  function handleKeyDown(index, e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (debouncedAnalyze.current) debouncedAnalyze.current.cancel();
+      finalizeLine(index);
+    }
+  }
+
+  const finalized = lines.filter((l) => l.done);
 
   return (
-      <div className="max-w-xl mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-4">PerhizApp Food NLP</h1>
-        <div className="relative mb-3">
-          <input
-            type="text"
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Yediğinizi yazın: örn. 150 gram tavuk göğüsü"
-            className="w-full border rounded p-2 mb-1"
-          />
-          {suggestions.length > 0 && (
-            <ul className="absolute z-10 w-full bg-white border rounded shadow max-h-60 overflow-y-auto">
-              {suggestions.map((item) => (
-                <li
-                  key={item.name}
-                  className="p-2 cursor-pointer hover:bg-gray-200"
-                  onClick={() => handleSelect(item)}
-                >
-                  {item.name}
-                </li>
+    <div className="flex gap-8 p-4">
+      <div className="flex-1">
+        {lines.map((line, idx) => (
+          <div key={idx} className="relative mb-2">
+            {line.done ? (
+              <div className="p-2 border rounded bg-gray-50">{line.text}</div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={line.text}
+                  onChange={(e) => handleChange(idx, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(idx, e)}
+                  onFocus={() => setActiveIndex(idx)}
+                  className="w-full border rounded p-2"
+                  placeholder="Bir besin yazın"
+                />
+                {activeIndex === idx && suggestions.length > 0 && (
+                  <ul className="absolute z-10 w-full bg-white border rounded shadow max-h-60 overflow-y-auto">
+                    {suggestions.map((item) => (
+                      <li
+                        key={item.name}
+                        className="p-2 cursor-pointer hover:bg-gray-200"
+                        onMouseDown={() => handleSelect(item)}
+                      >
+                        {item.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="w-72">
+        {finalized.length ? (
+          <table className="min-w-full text-sm border-collapse">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left py-1">Besin</th>
+                <th className="text-right py-1">Miktar(g)</th>
+                <th className="text-right py-1">kcal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {finalized.map((l, i) => (
+                <tr key={i} className="border-b last:border-0">
+                  <td className="pr-2">{l.selected.name}</td>
+                  <td className="text-right pr-2">{l.amount}</td>
+                  <td className="text-right">{(l.selected.calorie * l.amount / 100).toFixed(1)}</td>
+                </tr>
               ))}
-            </ul>
-          )}
-        </div>
-        {result ? (
-            <div className="p-4 rounded shadow bg-white">
-              <h2 className="text-xl font-semibold mb-2">{result.name}</h2>
-              <div className="mb-1">Amount: <b>{amount}</b> g (shown per entered amount)</div>
-              <ul>
-                <li>Calories: {(result.calorie * amount / 100).toFixed(1)} kcal</li>
-                <li>Protein: {(result.protein * amount / 100).toFixed(1)} g</li>
-                <li>Carb: {(result.carb * amount / 100).toFixed(1)} g</li>
-                <li>Fat: {(result.fat * amount / 100).toFixed(1)} g</li>
-                <li>Fiber: {(result.fiber * amount / 100).toFixed(1)} g</li>
-              </ul>
-            </div>
+            </tbody>
+          </table>
         ) : (
-            input && (
-                <div className="p-4 rounded bg-red-100 text-red-700">
-                  No matching food found!
-                </div>
-            )
+          <p className="text-sm text-gray-500">Henüz bir besin eklenmedi.</p>
         )}
       </div>
+    </div>
   );
 }
