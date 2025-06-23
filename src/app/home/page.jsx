@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import debounce from "lodash.debounce";
-import {extractAmount, fuzzyFind} from "@/app/home/analyzer";
+import { extractAmount, fuzzyFind } from "@/app/home/analyzer";
 
 
 export default function FoodNLPPage() {
@@ -10,14 +10,16 @@ export default function FoodNLPPage() {
   const [input, setInput] = useState("");
   const [result, setResult] = useState(null);
   const [amount, setAmount] = useState(100);
+  const [suggestions, setSuggestions] = useState([]);
 
   // YENİ: foodList her değiştiğinde yeni debounce oluşturmak için ref ve useEffect kullanıyoruz
   const analyzeInput = (val) => {
-    const food = fuzzyFind(foodList, val);
+    const matches = fuzzyFind(foodList, val);
+    setSuggestions(matches);
     const amt = extractAmount(val);
     setAmount(amt);
-    if (food) {
-      setResult(food);
+    if (matches && matches.length) {
+      setResult(matches[0]);
     } else {
       setResult(null);
     }
@@ -43,11 +45,18 @@ export default function FoodNLPPage() {
     }
   }
 
+  function handleSelect(item) {
+    setResult(item);
+    setInput(item.name);
+    setSuggestions([]);
+  }
+
   // Fetch food list on mount
   useEffect(() => {
-    fetch("http://localhost:8080/api/food/getAll")
-        .then((res) => res.json())
-        .then((data) => setFoodList(data));
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+    fetch(`${baseUrl}/api/food/getAll`)
+      .then((res) => res.json())
+      .then((data) => setFoodList(data));
   }, []);
 
   //EXAMPLE foodList FORMAT
@@ -85,14 +94,29 @@ export default function FoodNLPPage() {
   return (
       <div className="max-w-xl mx-auto p-4">
         <h1 className="text-2xl font-bold mb-4">PerhizApp Food NLP</h1>
-        <input
+        <div className="relative mb-3">
+          <input
             type="text"
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder="Yediğinizi yazın: örn. 150 gram tavuk göğüsü"
-            className="w-full border rounded p-2 mb-3"
-        />
+            className="w-full border rounded p-2 mb-1"
+          />
+          {suggestions.length > 0 && (
+            <ul className="absolute z-10 w-full bg-white border rounded shadow max-h-60 overflow-y-auto">
+              {suggestions.map((item) => (
+                <li
+                  key={item.name}
+                  className="p-2 cursor-pointer hover:bg-gray-200"
+                  onClick={() => handleSelect(item)}
+                >
+                  {item.name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         {result ? (
             <div className="p-4 rounded shadow bg-white">
               <h2 className="text-xl font-semibold mb-2">{result.name}</h2>
