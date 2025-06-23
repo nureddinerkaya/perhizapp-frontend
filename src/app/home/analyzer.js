@@ -1,3 +1,5 @@
+import Fuse from "fuse.js";
+
 //EXAMPLE foodList FORMAT
 /*
   {
@@ -46,10 +48,37 @@ export function normalizeInput(input) {
       .replace(/û/g, "u");
 }
 
-// Fuzzy find: simple case-insensitive substring match, returns the best match or null
+// Fuzzy find using Fuse.js: returns the best matching food item or null
 export function fuzzyFind(foodList, input) {
   const normalizedInput = normalizeInput(input);
-    if (!normalizedInput) return null;
+  if (!normalizedInput || !foodList) return null;
+
+  const foodsArray = Array.isArray(foodList)
+      ? foodList.map((item) => ({
+          ...item,
+          normalizedName: normalizeInput(item.name),
+        }))
+      : Object.values(foodList).map((item) => ({
+          ...item,
+          normalizedName: normalizeInput(item.name),
+        }));
+
+  const fuse = new Fuse(foodsArray, {
+    keys: ["normalizedName"],
+    threshold: 0.8,
+    includeScore: true,
+    ignoreLocation: true,
+  });
+
+  const results = fuse.search(normalizedInput);
+  if (results.length) {
+    console.log(
+        "Top 5 matches:",
+        results.slice(0, 5).map((r) => r.item.name).join(", ")
+    );
+    return results[0].item;
+  }
+  return null;
 }
 
 // Extract amount: looks for a number in the input, returns it, or defaults to 100
