@@ -89,12 +89,65 @@ export function fuzzyFind(foodList, input, limit = 5) {
 }
 
 // Extract amount: looks for a number in the input, returns it, or defaults to 100
-export function extractAmount(input) {
-  if (!input) return 100;
-  const match = input.match(/(\d+([\.,]\d+)?)/);
-  if (match) {
-    // Replace comma with dot for decimal numbers
-    return parseFloat(match[0].replace(",", "."));
+export function extractAmount(input, portionSize = 100) {
+  if (!input) return portionSize;
+
+  let normalized = normalizeInput(input) || "";
+  normalized = normalized.replace(/\./g, "");
+
+  const portionKeywords = [
+    "adet",
+    "dilim",
+    "kasik",
+    "corba kasigi",
+    "tatli kasigi",
+    "yemek kasigi",
+    "cay kasigi",
+    "kepce",
+    "tabak",
+    "porsiyon",
+    "bardak",
+    "cay bardagi",
+    "su bardagi",
+    "kutu",
+    "sise",
+    "paket",
+    "parca",
+  ];
+  const gramKeywords = ["gram", "gr"];
+  const kgKeywords = ["kilogram", "kilo", "kg"];
+
+  const includesAny = (list) =>
+    list.some((kw) => normalized.includes(kw));
+
+  // Parse numeric value (decimals or fractions)
+  let quantity;
+  const fractionMatch = normalized.match(/(\d+)\s*\/\s*(\d+)/);
+  if (fractionMatch) {
+    quantity =
+      parseFloat(fractionMatch[1]) / parseFloat(fractionMatch[2]);
+  } else {
+    const numMatch = normalized.match(/\d+(?:[\.,]\d+)?/);
+    if (numMatch) {
+      quantity = parseFloat(numMatch[0].replace(",", "."));
+    }
   }
-  return 100;
+
+  if (quantity === undefined) {
+    if (normalized.includes("yarim")) quantity = 0.5;
+    else if (normalized.includes("ceyrek")) quantity = 0.25;
+    else quantity = 1;
+  }
+
+  let grams;
+  if (includesAny(kgKeywords)) {
+    grams = quantity * 1000;
+  } else if (includesAny(gramKeywords)) {
+    grams = quantity;
+  } else {
+    // default or portion keywords -> multiply by portion size
+    grams = quantity * portionSize;
+  }
+
+  return grams;
 }
