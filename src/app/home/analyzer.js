@@ -72,11 +72,11 @@ export function fuzzyFind(foodList, input) {
 
   const results = fuse.search(normalizedInput);
   if (results.length) {
-    console.log(
-        "Top 5 matches:",
-        results.slice(0, 5).map((r) => r.item.name).join(", ")
-    );
-    return results[0].item;
+      console.log(
+        "Top 10 matches:",
+        results.slice(0, 10).map((r) => `${r.item.name} (score: ${r.score})`).join(", ")
+      );
+      return results[0].item;
   }
   return null;
 }
