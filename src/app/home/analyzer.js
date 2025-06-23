@@ -81,7 +81,7 @@ export function fuzzyFind(foodList, input, limit = 5, tokenScoreThreshold = 0.4)
 
   const results = fuse.search(searchQuery);
   if (process.env.NODE_ENV !== "production" && results.length) {
-    console.debug(
+    console.log(
       "Top matches:",
       results
         .slice(0, 10)
