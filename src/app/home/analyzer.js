@@ -48,10 +48,10 @@ export function normalizeInput(input) {
       .replace(/û/g, "u");
 }
 
-// Fuzzy find using Fuse.js: returns the best matching food item or null
-export function fuzzyFind(foodList, input) {
+// Fuzzy find using Fuse.js: returns up to `limit` matching food items
+export function fuzzyFind(foodList, input, limit = 5) {
   const normalizedInput = normalizeInput(input);
-  if (!normalizedInput || !foodList) return null;
+  if (!normalizedInput || !foodList || normalizedInput.length < 2) return [];
 
   const foodsArray = Array.isArray(foodList)
       ? foodList.map((item) => ({
@@ -65,20 +65,27 @@ export function fuzzyFind(foodList, input) {
 
   const fuse = new Fuse(foodsArray, {
     keys: ["normalizedName"],
-    threshold: 0.8,
+    threshold: 0.4,
     includeScore: true,
     ignoreLocation: true,
+    minMatchCharLength: 2,
   });
 
   const results = fuse.search(normalizedInput);
-  if (results.length) {
-      console.log(
-        "Top 10 matches:",
-        results.slice(0, 10).map((r) => `${r.item.name} (score: ${r.score})`).join(", ")
-      );
-      return results[0].item;
+  if (process.env.NODE_ENV !== "production" && results.length) {
+    console.debug(
+      "Top matches:",
+      results
+        .slice(0, 10)
+        .map((r) => `${r.item.name} (score: ${r.score})`)
+        .join(", ")
+    );
   }
-  return null;
+
+  return results
+    .filter((r) => r.score <= 0.4)
+    .slice(0, limit)
+    .map((r) => r.item);
 }
 
 // Extract amount: looks for a number in the input, returns it, or defaults to 100
