@@ -27,7 +27,7 @@ export default function FoodNLPPage() {
 
   const debouncedAnalyze = useRef();
   useEffect(() => {
-    debouncedAnalyze.current = debounce(analyzeInput, 400);
+    debouncedAnalyze.current = debounce(analyzeInput, 300);
     // Temizlik
     return () => debouncedAnalyze.current.cancel();
   }, [foodList]); // foodList değiştikçe yeni debounce oluştur
