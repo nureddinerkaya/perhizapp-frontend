@@ -16,7 +16,8 @@ export default function FoodNLPPage() {
   const analyzeInput = (val) => {
     const matches = fuzzyFind(foodList, val);
     setSuggestions(matches);
-    const amt = extractAmount(val);
+    const portion = matches && matches.length ? matches[0].portion : 100;
+    const amt = extractAmount(val, portion);
     setAmount(amt);
     if (matches && matches.length) {
       setResult(matches[0]);
@@ -46,6 +47,8 @@ export default function FoodNLPPage() {
   }
 
   function handleSelect(item) {
+    const amt = extractAmount(input, item.portion);
+    setAmount(amt);
     setResult(item);
     setInput(item.name);
     setSuggestions([]);

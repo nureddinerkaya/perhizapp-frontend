@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fuzzyFind } from '../src/app/home/analyzer.js';
+import { fuzzyFind, extractAmount } from '../src/app/home/analyzer.js';
 
 const foodList = [
   { name: 'Tavuk Göğsü' },
@@ -18,4 +18,21 @@ test('phrase with extra word içtim matches tavuk göğsü', () => {
   const matches = fuzzyFind(foodList, 'tavuk göğüsü içtim');
   assert.ok(matches.length > 0, 'no matches returned');
   assert.equal(matches[0].name, 'Tavuk Göğsü');
+});
+
+test('extractAmount handles portion keywords', () => {
+  const grams = extractAmount('3 adet elma', 90);
+  assert.equal(grams, 270);
+});
+
+test('extractAmount handles gram keywords without space', () => {
+  assert.equal(extractAmount('200gram tavuk'), 200);
+});
+
+test('extractAmount handles kilogram with fraction', () => {
+  assert.equal(extractAmount('1/2 kg et'), 500);
+});
+
+test('extractAmount handles yarım keyword', () => {
+  assert.equal(extractAmount('yarım dilim kek', 80), 40);
 });

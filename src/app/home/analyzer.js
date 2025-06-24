@@ -155,12 +155,40 @@ if (process.env.NODE_ENV !== "production" && uniqueSortedResults.length) {
 }
 
 // Extract amount: looks for a number in the input, returns it, or defaults to 100
-export function extractAmount(input) {
+export function extractAmount(input, portion = 100) {
   if (!input) return 100;
-  const match = input.match(/(\d+([\.,]\d+)?)/);
-  if (match) {
-    // Replace comma with dot for decimal numbers
-    return parseFloat(match[0].replace(",", "."));
+  const normalized = normalizeInput(input);
+
+  const textWithoutNumbers = normalized.replace(/\d+(?:[.,]\d+)?/g, "");
+
+  const gramRegex = /\d+(?:[.,]\d+)?\s*(?:g|gr|gram)(?![a-z])/;
+  const gramWordRegex = /\b(?:gram|gr)\b/;
+  const kiloRegex = /\d+(?:[.,]\d+)?\s*(?:kg|kilo|kilogram)(?![a-z])/;
+  const kiloWordRegex = /\b(?:kg|kilo|kilogram)\b/;
+
+  const isGram = gramRegex.test(normalized) || gramWordRegex.test(textWithoutNumbers);
+  const isKilo = kiloRegex.test(normalized) || kiloWordRegex.test(textWithoutNumbers);
+
+  let amount = null;
+
+  const fraction = normalized.match(/(\d+)\s*\/\s*(\d+)/);
+  if (fraction) {
+    amount = parseInt(fraction[1], 10) / parseInt(fraction[2], 10);
+  } else {
+    const num = normalized.match(/\d+(?:[.,]\d+)?/);
+    if (num) {
+      amount = parseFloat(num[0].replace(",", "."));
+    }
   }
-  return 100;
+
+  if (amount === null) {
+    if (normalized.includes("yarim")) amount = 0.5;
+    else if (normalized.includes("ceyrek")) amount = 0.25;
+  }
+
+  if (amount === null) return 100;
+
+  if (isKilo) return amount * 1000;
+  if (isGram) return amount;
+  return amount * portion;
 }
