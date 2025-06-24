@@ -54,7 +54,7 @@ export default function FoodNLPPage() {
     const unit = detectUnit(input);
     let display = "";
     if (unit === "gram") {
-      display = `gram ${amt} ${item.name} `;
+      display = `${amt} gram ${item.name} `;
     } else {
       let portionVal = amt / (item.portion || 100);
       portionVal = Number.isInteger(portionVal) ? portionVal : portionVal.toFixed(2);
@@ -140,19 +140,19 @@ export default function FoodNLPPage() {
         {result ? (
             <div className="p-4 rounded shadow bg-white">
               <h2 className="text-xl font-semibold mb-2">{result.name}</h2>
-              <div className="mb-1">Amount: <b>{formatNumber(amount)}</b> g (shown per entered amount)</div>
+              <div className="mb-1">Miktar: {formatNumber(amount)} g</div>
               <ul>
-                <li>Calories: {formatNumber(result.calorie * amount / 100)} kcal</li>
+                <li>Kalori: {formatNumber(result.calorie * amount / 100)} kcal</li>
                 <li>Protein: {formatNumber(result.protein * amount / 100)} g</li>
-                <li>Carb: {formatNumber(result.carb * amount / 100)} g</li>
-                <li>Fat: {formatNumber(result.fat * amount / 100)} g</li>
-                <li>Fiber: {formatNumber(result.fiber * amount / 100)} g</li>
+                <li>Karbonhidrat: {formatNumber(result.carb * amount / 100)} g</li>
+                <li>Yağ: {formatNumber(result.fat * amount / 100)} g</li>
+                <li>Lif: {formatNumber(result.fiber * amount / 100)} g</li>
               </ul>
             </div>
         ) : (
             input && (
                 <div className="p-4 rounded bg-red-100 text-red-700">
-                  No matching food found!
+                  Eşleşen gıda bulunamadı!
                 </div>
             )
         )}
