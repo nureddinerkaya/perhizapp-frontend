@@ -50,7 +50,8 @@ export default function FoodNLPPage() {
     const amt = extractAmount(input, item.portion);
     setAmount(amt);
     setResult(item);
-    setInput(item.name);
+    // keep the original input so amount keywords remain visible
+    setInput(input);
     setSuggestions([]);
   }
 

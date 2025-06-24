@@ -36,3 +36,23 @@ test('extractAmount handles kilogram with fraction', () => {
 test('extractAmount handles yarım keyword', () => {
   assert.equal(extractAmount('yarım dilim kek', 80), 40);
 });
+
+test('fuzzyFind ignores portion keywords', () => {
+  const matches = fuzzyFind(foodList, '3 dilim tavuk göğsü');
+  assert.ok(matches.length > 0);
+  assert.equal(matches[0].name, 'Tavuk Göğsü');
+});
+
+test('fuzzyFind tolerates keyword typos', () => {
+  const matches = fuzzyFind(foodList, '2 tabka tavuk göğsü');
+  assert.ok(matches.length > 0);
+  assert.equal(matches[0].name, 'Tavuk Göğsü');
+});
+
+test('extractAmount handles typo in gram keyword', () => {
+  assert.equal(extractAmount('200 gra tavuk'), 200);
+});
+
+test('extractAmount handles typo in portion keyword', () => {
+  assert.equal(extractAmount('2 poriyon kek', 50), 100);
+});

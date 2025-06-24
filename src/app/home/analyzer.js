@@ -1,5 +1,84 @@
 import Fuse from "fuse.js";
 
+// keywords used for amounts
+const portionKeywords = [
+  "adet",
+  "dilim",
+  "kasik",
+  "corba kasigi",
+  "tatli kasigi",
+  "yemek kasigi",
+  "cay kasigi",
+  "kepce",
+  "tabak",
+  "porsiyon",
+  "bardak",
+  "cay bardagi",
+  "su bardagi",
+  "kutu",
+  "sise",
+  "paket",
+  "parca",
+];
+const gramKeywords = ["gram", "gr", "g"];
+const kiloKeywords = ["kilogram", "kilo", "kg"];
+
+function levenshtein(a, b) {
+  const matrix = [];
+  for (let i = 0; i <= a.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 1; j <= b.length; j++) {
+    matrix[0][j] = j;
+  }
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return matrix[a.length][b.length];
+}
+
+function approxMatch(word, keywords, maxDist = 2) {
+  return keywords.some((k) => {
+    const dist = levenshtein(word, k);
+    const allowed = word.length <= 3 || k.length <= 3 ? 1 : maxDist;
+    return dist <= allowed;
+  });
+}
+
+function stripAmountKeywords(text) {
+  const cleaned = text.replace(/[.,]/g, " ");
+  const tokens = cleaned.split(/\s+/).filter(Boolean);
+  const filtered = tokens.filter((t) => {
+    if (/^\d+(?:[.,]\d+)?$/.test(t)) return false;
+    const mix = t.match(/^(\d+(?:[.,]\d+)?)([a-z]+)$/);
+    if (mix) {
+      if (
+        approxMatch(mix[2], [
+          ...portionKeywords,
+          ...gramKeywords,
+          ...kiloKeywords,
+        ])
+      ) {
+        return false;
+      }
+      return true;
+    }
+    return !approxMatch(t, [
+      ...portionKeywords,
+      ...gramKeywords,
+      ...kiloKeywords,
+    ]);
+  });
+  return filtered.join(" ");
+}
+
 //EXAMPLE foodList FORMAT
 /*
   {
@@ -53,6 +132,8 @@ export function fuzzyFind(foodList, input, limit = 5, tokenScoreThreshold = 0.3)
   const normalizedInput = normalizeInput(input);
   if (!normalizedInput || !foodList || normalizedInput.length < 2) return [];
 
+  const cleanedInput = stripAmountKeywords(normalizedInput);
+
   const foodsArray = Array.isArray(foodList)
       ? foodList.map((item) => ({
           ...item,
@@ -71,8 +152,8 @@ export function fuzzyFind(foodList, input, limit = 5, tokenScoreThreshold = 0.3)
     minMatchCharLength: 2,
   });
 
-// Split the normalized input into tokens (words)
-const tokens = normalizedInput.split(/\s+/).filter(Boolean);
+// Split the cleaned input into tokens (words)
+const tokens = cleanedInput.split(/\s+/).filter(Boolean);
 
 // Helper to get all 2- and 3-word combinations from tokens
 function getCombinations(arr, comboLength) {
@@ -99,7 +180,7 @@ const searchQueries = [
   ...(filteredTokens.length ? [filteredTokens.join(" ")] : []),
   ...twoWordCombos,
   ...threeWordCombos,
-  normalizedInput,
+  cleanedInput,
 ].filter(Boolean);
 
 // Perform fuzzy search for each query, collect all results
@@ -159,15 +240,31 @@ export function extractAmount(input, portion = 100) {
   if (!input) return 100;
   const normalized = normalizeInput(input);
 
-  const textWithoutNumbers = normalized.replace(/\d+(?:[.,]\d+)?/g, "");
+  const cleaned = normalized.replace(/[.,]/g, " ");
+  const tokens = cleaned.split(/\s+/).filter(Boolean);
 
-  const gramRegex = /\d+(?:[.,]\d+)?\s*(?:g|gr|gram)(?![a-z])/;
-  const gramWordRegex = /\b(?:gram|gr)\b/;
-  const kiloRegex = /\d+(?:[.,]\d+)?\s*(?:kg|kilo|kilogram)(?![a-z])/;
-  const kiloWordRegex = /\b(?:kg|kilo|kilogram)\b/;
+  let isGram = false;
+  let isKilo = false;
+  let hasHalf = false;
+  let hasQuarter = false;
 
-  const isGram = gramRegex.test(normalized) || gramWordRegex.test(textWithoutNumbers);
-  const isKilo = kiloRegex.test(normalized) || kiloWordRegex.test(textWithoutNumbers);
+  for (const t of tokens) {
+    if (/^\d/.test(t)) {
+      const mix = t.match(/^(\d+(?:[.,]\d+)?)([a-z]+)$/);
+      if (mix) {
+        if (approxMatch(mix[2], kiloKeywords)) isKilo = true;
+        else if (approxMatch(mix[2], gramKeywords)) isGram = true;
+      }
+    } else if (approxMatch(t, kiloKeywords)) {
+      isKilo = true;
+    } else if (approxMatch(t, gramKeywords)) {
+      isGram = true;
+    } else if (approxMatch(t, ["yarim"])) {
+      hasHalf = true;
+    } else if (approxMatch(t, ["ceyrek"])) {
+      hasQuarter = true;
+    }
+  }
 
   let amount = null;
 
@@ -182,8 +279,8 @@ export function extractAmount(input, portion = 100) {
   }
 
   if (amount === null) {
-    if (normalized.includes("yarim")) amount = 0.5;
-    else if (normalized.includes("ceyrek")) amount = 0.25;
+    if (hasHalf) amount = 0.5;
+    else if (hasQuarter) amount = 0.25;
   }
 
   if (amount === null) return 100;
