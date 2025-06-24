@@ -97,12 +97,44 @@ export function fuzzyFind(foodList, input, limit = 5, tokenScoreThreshold = 0.4)
 }
 
 // Extract amount: looks for a number in the input, returns it, or defaults to 100
-export function extractAmount(input) {
-  if (!input) return 100;
-  const match = input.match(/(\d+([\.,]\d+)?)/);
-  if (match) {
-    // Replace comma with dot for decimal numbers
-    return parseFloat(match[0].replace(",", "."));
+export function extractAmount(input, portion = 100) {
+  if (!input) return portion;
+
+  let text = input.toString().toLowerCase();
+
+  // common fraction words
+  text = text.replace(/yarım/g, "0.5");
+  text = text.replace(/çeyrek/g, "0.25");
+
+  // convert simple fractions like 1/2 or 3/4 to decimals
+  text = text.replace(/(\d+)\s*\/\s*(\d+)/g, (_, a, b) => {
+    const num = parseFloat(a);
+    const denom = parseFloat(b);
+    return denom ? (num / denom).toString() : _;
+  });
+
+  const numberMatch = text.match(/(\d+(?:[\.,]\d+)?)/);
+  const amount = numberMatch
+    ? parseFloat(numberMatch[0].replace(",", "."))
+    : 1;
+
+  const normalized = text.replace(/[.]/g, " ");
+
+  const gramRegex = /\b\d*(?:\s*)?(?:gr|gram)\.?\b/;
+  const kiloRegex = /\b\d*(?:\s*)?(?:kg|kilo|kilogram)\.?\b/;
+  const portionRegex = /adet|dilim|kaşık|çorba kaşığı|tatlı kaşığı|yemek kaşığı|çay kaşığı|kepçe|tabak|porsiyon|bardak|çay bardağı|su bardağı|kutu|şişe|paket|parça/;
+
+  if (kiloRegex.test(normalized)) {
+    return amount * 1000;
   }
-  return 100;
+
+  if (gramRegex.test(normalized)) {
+    return amount;
+  }
+
+  if (portionRegex.test(normalized) || numberMatch) {
+    return amount * portion;
+  }
+
+  return portion;
 }
