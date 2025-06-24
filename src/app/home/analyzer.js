@@ -65,7 +65,7 @@ export function fuzzyFind(foodList, input, limit = 5) {
 
   const fuse = new Fuse(foodsArray, {
     keys: ["normalizedName"],
-    threshold: 0.4,
+    threshold: 0.35,
     includeScore: true,
     ignoreLocation: true,
     minMatchCharLength: 2,
