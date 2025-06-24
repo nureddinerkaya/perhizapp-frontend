@@ -23,33 +23,18 @@ const portionKeywords = [
 const gramKeywords = ["gram", "gr", "g"];
 const kiloKeywords = ["kilogram", "kilo", "kg"];
 
-function levenshtein(a, b) {
-  const matrix = [];
-  for (let i = 0; i <= a.length; i++) {
-    matrix[i] = [i];
-  }
-  for (let j = 1; j <= b.length; j++) {
-    matrix[0][j] = j;
-  }
-  for (let i = 1; i <= a.length; i++) {
-    for (let j = 1; j <= b.length; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,
-        matrix[i][j - 1] + 1,
-        matrix[i - 1][j - 1] + cost
-      );
-    }
-  }
-  return matrix[a.length][b.length];
-}
-
-function approxMatch(word, keywords, maxDist = 2) {
-  return keywords.some((k) => {
-    const dist = levenshtein(word, k);
-    const allowed = word.length <= 3 || k.length <= 3 ? 1 : maxDist;
-    return dist <= allowed;
+function approxMatch(word, keywords) {
+  const fuse = new Fuse(keywords, {
+    includeScore: true,
+    threshold: 0.3,
+    ignoreLocation: true,
+    isCaseSensitive: false,
   });
+  const res = fuse.search(word);
+  if (!res.length) return false;
+  const best = res[0];
+  const lenDiff = Math.abs(word.length - best.item.length);
+  return best.score <= 0.3 && lenDiff <= 2;
 }
 
 function stripAmountKeywords(text) {
@@ -288,4 +273,27 @@ export function extractAmount(input, portion = 100) {
   if (isKilo) return amount * 1000;
   if (isGram) return amount;
   return amount * portion;
+}
+
+export function detectUnit(input) {
+  if (!input) return "porsiyon";
+  const normalized = normalizeInput(input);
+  const cleaned = normalized.replace(/[.,]/g, " ");
+  const tokens = cleaned.split(/\s+/).filter(Boolean);
+  let isGram = false;
+  let isKilo = false;
+  for (const t of tokens) {
+    if (/^\d/.test(t)) {
+      const mix = t.match(/^(\d+(?:[.,]\d+)?)([a-z]+)$/);
+      if (mix) {
+        if (approxMatch(mix[2], kiloKeywords)) isKilo = true;
+        else if (approxMatch(mix[2], gramKeywords)) isGram = true;
+      }
+    } else if (approxMatch(t, kiloKeywords)) {
+      isKilo = true;
+    } else if (approxMatch(t, gramKeywords)) {
+      isGram = true;
+    }
+  }
+  return isGram || isKilo ? "gram" : "porsiyon";
 }

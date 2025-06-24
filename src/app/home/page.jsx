@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import debounce from "lodash.debounce";
-import { extractAmount, fuzzyFind } from "@/app/home/analyzer";
+import { extractAmount, fuzzyFind, detectUnit } from "@/app/home/analyzer";
 
 
 export default function FoodNLPPage() {
@@ -50,8 +50,16 @@ export default function FoodNLPPage() {
     const amt = extractAmount(input, item.portion);
     setAmount(amt);
     setResult(item);
-    // keep the original input so amount keywords remain visible
-    setInput(input);
+
+    const unit = detectUnit(input);
+    let display = "";
+    if (unit === "gram") {
+      display = `${item.name} ${amt} gram`;
+    } else {
+      const portionVal = (amt / (item.portion || 100)).toFixed(2);
+      display = `${item.name} ${portionVal} porsiyon`;
+    }
+    setInput(display);
     setSuggestions([]);
   }
 
