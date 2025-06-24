@@ -54,10 +54,11 @@ export default function FoodNLPPage() {
     const unit = detectUnit(input);
     let display = "";
     if (unit === "gram") {
-      display = `${item.name} ${amt} gram`;
+      display = `gram ${amt} ${item.name} `;
     } else {
-      const portionVal = (amt / (item.portion || 100)).toFixed(2);
-      display = `${item.name} ${portionVal} porsiyon`;
+      let portionVal = amt / (item.portion || 100);
+      portionVal = Number.isInteger(portionVal) ? portionVal : portionVal.toFixed(2);
+      display = `${portionVal} porsiyon ${item.name}`;
     }
     setInput(display);
     setSuggestions([]);
@@ -103,6 +104,13 @@ export default function FoodNLPPage() {
   },
 */
 
+  // Helper to format numbers with up to 2 decimals, but no trailing zeros
+  function formatNumber(val) {
+    if (typeof val !== "number" || isNaN(val)) return "";
+    if (Number.isInteger(val)) return val.toString();
+    return parseFloat(val.toFixed(2)).toString();
+  }
+
   return (
       <div className="max-w-xl mx-auto p-4">
         <h1 className="text-2xl font-bold mb-4">PerhizApp Food NLP</h1>
@@ -132,13 +140,13 @@ export default function FoodNLPPage() {
         {result ? (
             <div className="p-4 rounded shadow bg-white">
               <h2 className="text-xl font-semibold mb-2">{result.name}</h2>
-              <div className="mb-1">Amount: <b>{amount}</b> g (shown per entered amount)</div>
+              <div className="mb-1">Amount: <b>{formatNumber(amount)}</b> g (shown per entered amount)</div>
               <ul>
-                <li>Calories: {(result.calorie * amount / 100).toFixed(1)} kcal</li>
-                <li>Protein: {(result.protein * amount / 100).toFixed(1)} g</li>
-                <li>Carb: {(result.carb * amount / 100).toFixed(1)} g</li>
-                <li>Fat: {(result.fat * amount / 100).toFixed(1)} g</li>
-                <li>Fiber: {(result.fiber * amount / 100).toFixed(1)} g</li>
+                <li>Calories: {formatNumber(result.calorie * amount / 100)} kcal</li>
+                <li>Protein: {formatNumber(result.protein * amount / 100)} g</li>
+                <li>Carb: {formatNumber(result.carb * amount / 100)} g</li>
+                <li>Fat: {formatNumber(result.fat * amount / 100)} g</li>
+                <li>Fiber: {formatNumber(result.fiber * amount / 100)} g</li>
               </ul>
             </div>
         ) : (
