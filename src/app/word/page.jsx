@@ -118,6 +118,7 @@ export default function WordEditorPage() {
       if (debouncedAnalyze.current) debouncedAnalyze.current.cancel();
       const textarea = textareaRef.current;
       const val = textarea.value;
+      const atEnd = textarea.selectionStart === val.length;
       const before = val.slice(0, textarea.selectionStart);
       const lines = val.split("\n");
       const lineIndex = before.split("\n").length - 1;
@@ -144,7 +145,9 @@ export default function WordEditorPage() {
       // Sadece güncellenen satırları analiz et
       analyzeLine(lines[lineIndex], lineIndex);
       analyzeLine("", lineIndex + 1);
-      adjustHeight();
+      if (atEnd) {
+        adjustHeight();
+      }
       requestAnimationFrame(() => {
         // İmleci yeni satıra konumlandır
         const pos = lines.slice(0, lineIndex + 2).join("\n").length + 1;
