@@ -22,17 +22,14 @@ export default function WordEditorPage() {
 
   useEffect(() => {
     if (typeof window !== "undefined" && containerHeight === 0) {
-      setContainerHeight(window.innerHeight * 0.8);
+      setContainerHeight(window.innerHeight);
     }
   }, []);
 
-  useEffect(() => {
-    adjustHeight();
-  }, [text]);
 
   function adjustHeight() {
     if (!textareaRef.current || !resultsRef.current) return;
-    const base = window.innerHeight * 0.8;
+    const base = window.innerHeight;
     const needed = Math.max(
       textareaRef.current.scrollHeight,
       resultsRef.current.scrollHeight
@@ -113,7 +110,6 @@ export default function WordEditorPage() {
         debouncedAnalyze.current(currLine);
       }
     }
-    adjustHeight();
   }
 
   function handleKeyDown(e) {
@@ -159,10 +155,10 @@ export default function WordEditorPage() {
   }
 
   return (
-    <div className="flex justify-center items-center p-8 bg-gray-100 min-h-screen">
+    <div className="flex justify-center items-start bg-gray-100 min-h-screen px-8">
       <div className="relative flex w-full justify-center">
         <div
-          className="bg-white w-full max-w-[1100px] min-h-[80vh] h-auto shadow p-8 flex flex-row gap-4"
+          className="bg-white w-full max-w-[1100px] min-h-screen h-auto shadow p-8 flex flex-row gap-4"
           style={{ minHeight: containerHeight }}
         >
           <textarea
