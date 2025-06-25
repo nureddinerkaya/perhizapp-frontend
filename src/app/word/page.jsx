@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import debounce from "lodash.debounce";
 import { extractAmount, fuzzyFind, detectUnit } from "@/app/home/analyzer";
 
@@ -8,7 +8,6 @@ export default function WordEditorPage() {
   const [text, setText] = useState("");
   const [results, setResults] = useState("");
   const [panelTop, setPanelTop] = useState(0);
-  const [containerHeight, setContainerHeight] = useState(0);
   const textareaRef = useRef(null);
   const resultsRef = useRef(null);
   const debouncedAnalyze = useRef(null);
@@ -19,23 +18,6 @@ export default function WordEditorPage() {
       .then((res) => res.json())
       .then((data) => setFoodList(data));
   }, []);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && containerHeight === 0) {
-      setContainerHeight(window.innerHeight);
-    }
-  }, []);
-
-
-  function adjustHeight() {
-    if (!textareaRef.current || !resultsRef.current) return;
-    const base = window.innerHeight;
-    const needed = Math.max(
-      textareaRef.current.scrollHeight,
-      resultsRef.current.scrollHeight
-    ) + 32;
-    setContainerHeight((h) => Math.max(h, Math.max(base, needed)));
-  }
 
   useEffect(() => {
     debouncedAnalyze.current = debounce((line) => {
@@ -110,6 +92,15 @@ export default function WordEditorPage() {
         debouncedAnalyze.current(currLine);
       }
     }
+    // textarea yüksekliğini ayarla
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+    if (resultsRef.current) {
+      resultsRef.current.style.height = 'auto';
+      resultsRef.current.style.height = resultsRef.current.scrollHeight + 'px';
+    }
   }
 
   function handleKeyDown(e) {
@@ -145,14 +136,20 @@ export default function WordEditorPage() {
       // Sadece güncellenen satırları analiz et
       analyzeLine(lines[lineIndex], lineIndex);
       analyzeLine("", lineIndex + 1);
-      if (atEnd) {
-        adjustHeight();
-      }
       requestAnimationFrame(() => {
         // İmleci yeni satıra konumlandır
         const pos = lines.slice(0, lineIndex + 2).join("\n").length + 1;
         textarea.selectionStart = textarea.selectionEnd = pos;
         setPanelTop((lineIndex + 2) * lineHeight - textarea.scrollTop);
+        // textarea yüksekliğini ayarla
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+        }
+        if (resultsRef.current) {
+          resultsRef.current.style.height = 'auto';
+          resultsRef.current.style.height = resultsRef.current.scrollHeight + 'px';
+        }
       });
     }
   }
@@ -160,24 +157,21 @@ export default function WordEditorPage() {
   return (
     <div className="flex justify-center items-start bg-gray-100 min-h-screen px-8">
       <div className="relative flex w-full justify-center">
-        <div
-          className="bg-white w-full max-w-[1100px] min-h-screen h-auto shadow p-8 flex flex-row gap-4"
-          style={{ minHeight: containerHeight }}
-        >
+        <div className="bg-white w-full max-w-[1100px] min-h-screen h-auto shadow p-8 flex flex-row gap-4">
           <textarea
             ref={textareaRef}
             value={text}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            style={{ minHeight: containerHeight, height: 'auto', overflowY: 'auto', resize: 'none' }}
-            className="w-1/3 outline-none p-2 bg-white"
+            style={{ resize: 'none' }}
+            className="w-1/3 outline-none p-2 bg-white text-xl"
           />
           <textarea
             ref={resultsRef}
             value={results}
             readOnly
-            style={{ minHeight: containerHeight, height: 'auto', overflowY: 'auto', resize: 'none' }}
-            className="w-2/3 outline-none p-2 bg-white text-gray-700"
+            style={{ resize: 'none' }}
+            className="w-2/3 outline-none p-2 bg-white text-gray-700 text-xl"
           />
         </div>
       </div>
