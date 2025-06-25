@@ -22,5 +22,12 @@ export default function RecordPage({ params }) {
   if (loading) return <div className="text-center p-8">Yükleniyor...</div>;
   if (!authorized) return <div className="text-center p-8">Erişim hatası</div>;
 
-  return <WordEditor />;
+  return (
+    <div className="p-4">
+      <h1 className="text-xl font-semibold mb-4 text-center">
+        {username} / {recordName}
+      </h1>
+      <WordEditor />
+    </div>
+  );
 }

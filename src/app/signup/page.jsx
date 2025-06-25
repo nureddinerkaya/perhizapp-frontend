@@ -10,7 +10,7 @@ export default function SignUpPage() {
 
   function handleSubmit(e) {
     e.preventDefault();
-    fetch(`${baseUrl}/api/auth/signup`, {
+    fetch(`${baseUrl}/api/users/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
