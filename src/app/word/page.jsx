@@ -9,6 +9,8 @@ export default function WordEditorPage() {
   const foodList = useFoodList();
   const [text, setText] = useState("");
   const [results, setResults] = useState([]); // Artık dizi
+  const [suggestions, setSuggestions] = useState([]);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const textareaRef = useRef(null);
   const resultsRef = useRef(null);
   const debouncedAnalyze = useRef(null);
@@ -46,6 +48,9 @@ export default function WordEditorPage() {
     const lineIndex = before.split("\n").length - 1;
     const lines = value.split("\n");
     const currLine = lines[lineIndex] || "";
+    const matches = currLine.trim() ? fuzzyFind(foodList, currLine) : [];
+    setSuggestions(matches);
+    setSelectedIndex(matches.length ? 0 : -1);
     // Sonuç dizisini satır sayısına göre senkronize et
     setResults((prevResults) => {
       const arr = prevResults.slice();
@@ -73,52 +78,95 @@ export default function WordEditorPage() {
     }
   }
 
+  function applySelection(item, lines, lineIndex) {
+    const rawLine = lines[lineIndex];
+    const amt = extractAmount(rawLine, item.portion);
+    const unit = detectUnit(rawLine);
+    let phrase = "";
+    if (unit === "gram") {
+      phrase = `${formatNumber(amt)} gram ${item.name}`;
+    } else {
+      let portionVal = amt / (item.portion || 100);
+      portionVal = Number.isInteger(portionVal) ? portionVal : portionVal.toFixed(2);
+      phrase = `${portionVal} porsiyon ${item.name}`;
+    }
+    lines[lineIndex] = phrase;
+  }
+
+  function finalizeLine(lines, lineIndex) {
+    // Alt satıra geçmek için ilgili yere boş satır ekle
+    lines.splice(lineIndex + 1, 0, "");
+    const newText = lines.join("\n");
+    setText(newText);
+    // Sadece güncellenen satırları analiz et
+    analyzeLine(lines[lineIndex], lineIndex);
+    analyzeLine("", lineIndex + 1);
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      const pos = lines.slice(0, lineIndex + 2).join("\n").length + 1;
+      textarea.selectionStart = textarea.selectionEnd = pos;
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+        textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+      }
+      if (resultsRef.current) {
+        resultsRef.current.style.height = 'auto';
+        resultsRef.current.style.height = resultsRef.current.scrollHeight + 'px';
+      }
+    });
+  }
+
   function handleKeyDown(e) {
+    const textarea = textareaRef.current;
+    const val = textarea.value;
+    const before = val.slice(0, textarea.selectionStart);
+    const lines = val.split("\n");
+    const lineIndex = before.split("\n").length - 1;
+
+    if (suggestions.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedIndex((selectedIndex + 1) % suggestions.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIndex((selectedIndex - 1 + suggestions.length) % suggestions.length);
+        return;
+      }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        setSelectedIndex((selectedIndex + 1) % suggestions.length);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setSuggestions([]);
+        setSelectedIndex(-1);
+        return;
+      }
+      if (e.key === "Enter") {
+        if (selectedIndex >= 0) {
+          e.preventDefault();
+          if (debouncedAnalyze.current) debouncedAnalyze.current.cancel();
+          applySelection(suggestions[selectedIndex], lines, lineIndex);
+          setSuggestions([]);
+          setSelectedIndex(-1);
+          finalizeLine(lines, lineIndex);
+          return;
+        }
+        // else fall through to default behavior
+      }
+    }
+
     if (e.key === "Enter") {
       e.preventDefault();
       if (debouncedAnalyze.current) debouncedAnalyze.current.cancel();
-      const textarea = textareaRef.current;
-      const val = textarea.value;
-      const before = val.slice(0, textarea.selectionStart);
-      const lines = val.split("\n");
-      const lineIndex = before.split("\n").length - 1;
-      const rawLine = lines[lineIndex];
-      const matches = fuzzyFind(foodList, rawLine);
+      const matches = fuzzyFind(foodList, lines[lineIndex]);
       if (matches && matches.length) {
-        const item = matches[0];
-        const amt = extractAmount(rawLine, item.portion);
-        const unit = detectUnit(rawLine);
-        let phrase = "";
-        if (unit === "gram") {
-          phrase = `${formatNumber(amt)} gram ${item.name}`;
-        } else {
-          let portionVal = amt / (item.portion || 100);
-          portionVal = Number.isInteger(portionVal) ? portionVal : portionVal.toFixed(2);
-          phrase = `${portionVal} porsiyon ${item.name}`;
-        }
-        lines[lineIndex] = phrase;
+        applySelection(matches[0], lines, lineIndex);
       }
-      // Alt satıra geçmek için ilgili yere boş satır ekle
-      lines.splice(lineIndex + 1, 0, "");
-      const newText = lines.join("\n");
-      setText(newText);
-      // Sadece güncellenen satırları analiz et
-      analyzeLine(lines[lineIndex], lineIndex);
-      analyzeLine("", lineIndex + 1);
-      requestAnimationFrame(() => {
-        // İmleci yeni satıra konumlandır
-        const pos = lines.slice(0, lineIndex + 2).join("\n").length + 1;
-        textarea.selectionStart = textarea.selectionEnd = pos;
-        // textarea yüksekliğini ayarla
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-          textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-        }
-        if (resultsRef.current) {
-          resultsRef.current.style.height = 'auto';
-          resultsRef.current.style.height = resultsRef.current.scrollHeight + 'px';
-        }
-      });
+      finalizeLine(lines, lineIndex);
     }
   }
 
@@ -199,15 +247,39 @@ export default function WordEditorPage() {
     >
       <div className="relative flex w-full justify-center">
         <div className="bg-white w-full max-w-[1100px] min-h-screen h-auto shadow p-8 flex flex-row gap-4">
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            style={{ resize: 'none' }}
-            className="w-1/3 outline-none p-2 bg-white text-xl"
-          />
+          <div className="relative w-1/3">
+            <textarea
+              ref={textareaRef}
+              value={text}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              style={{ resize: 'none' }}
+              className="w-full outline-none p-2 bg-white text-xl"
+            />
+            {suggestions.length > 0 && (
+              <ul className="absolute left-0 top-full mt-1 z-20 bg-white border rounded shadow max-h-40 overflow-y-auto text-sm w-full">
+                {suggestions.map((s, idx) => (
+                  <li
+                    key={s.name}
+                    className={`px-2 py-1 cursor-pointer ${idx === selectedIndex ? 'bg-gray-200' : ''}`}
+                    onMouseDown={e => {
+                      e.preventDefault();
+                      const lines = text.split('\n');
+                      const before = textareaRef.current.value.slice(0, textareaRef.current.selectionStart);
+                      const lineIndex = before.split('\n').length - 1;
+                      applySelection(s, lines, lineIndex);
+                      setSuggestions([]);
+                      setSelectedIndex(-1);
+                      finalizeLine(lines, lineIndex);
+                    }}
+                  >
+                    {s.name}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <div
             ref={resultsRef}
             className="w-2/3 outline-none p-2 bg-white text-gray-700 text-xl whitespace-pre-line select-text"
