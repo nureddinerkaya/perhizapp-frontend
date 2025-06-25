@@ -13,9 +13,28 @@ export default function WordEditorPage() {
   const resultsRef = useRef(null);
   const debouncedAnalyze = useRef(null);
 
+  // Suggestion dropdown state
+  const [suggestions, setSuggestions] = useState([]); // Array of food items
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestion, setSelectedSuggestion] = useState(-1); // -1: none
+  const [suggestionLine, setSuggestionLine] = useState(-1); // Which line suggestions are for
+
   useEffect(() => {
     debouncedAnalyze.current = debounce((line, lineIndex) => {
       analyzeLine(line, lineIndex);
+      // Suggestion logic: only if line is not empty
+      if (line.trim() !== "") {
+        const matches = fuzzyFind(foodList, line, 5);
+        setSuggestions(matches);
+        setShowSuggestions(matches.length > 0);
+        setSelectedSuggestion(-1);
+        setSuggestionLine(lineIndex);
+      } else {
+        setShowSuggestions(false);
+        setSuggestions([]);
+        setSelectedSuggestion(-1);
+        setSuggestionLine(-1);
+      }
     }, 400);
     return () => debouncedAnalyze.current && debouncedAnalyze.current.cancel();
   }, [foodList]);
@@ -34,8 +53,6 @@ export default function WordEditorPage() {
       return resultLines;
     });
   }
-
-
 
   function handleChange(e) {
     const val = e.target.value;
@@ -61,6 +78,10 @@ export default function WordEditorPage() {
           arr[lineIndex] = "";
           return arr;
         });
+        setShowSuggestions(false);
+        setSuggestions([]);
+        setSelectedSuggestion(-1);
+        setSuggestionLine(-1);
       }
     }
     if (textareaRef.current) {
@@ -74,6 +95,52 @@ export default function WordEditorPage() {
   }
 
   function handleKeyDown(e) {
+    // Suggestion menu navigation
+    if (showSuggestions && suggestions.length > 0 && suggestionLine >= 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedSuggestion((prev) => (prev + 1) % suggestions.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedSuggestion((prev) => (prev - 1 + suggestions.length) % suggestions.length);
+        return;
+      }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        setSelectedSuggestion((prev) => (prev + 1) % suggestions.length);
+        return;
+      }
+      if (e.key === "Escape") {
+        setShowSuggestions(false);
+        setSelectedSuggestion(-1);
+        return;
+      }
+      if (e.key === "Enter" && selectedSuggestion >= 0) {
+        e.preventDefault();
+        // Insert suggestion into current line
+        const textarea = textareaRef.current;
+        const val = textarea.value;
+        const lines = val.split("\n");
+        const item = suggestions[selectedSuggestion];
+        // Replace the current line with the suggestion's name
+        lines[suggestionLine] = item.name;
+        const newText = lines.join("\n");
+        setText(newText);
+        setShowSuggestions(false);
+        setSelectedSuggestion(-1);
+        setSuggestionLine(-1);
+        // Analyze the new line
+        analyzeLine(item.name, suggestionLine);
+        // Move cursor to end of line
+        setTimeout(() => {
+          const pos = lines.slice(0, suggestionLine + 1).join("\n").length;
+          textarea.selectionStart = textarea.selectionEnd = pos;
+        }, 0);
+        return;
+      }
+    }
     if (e.key === "Enter") {
       e.preventDefault();
       if (debouncedAnalyze.current) debouncedAnalyze.current.cancel();
@@ -105,6 +172,9 @@ export default function WordEditorPage() {
       // Sadece güncellenen satırları analiz et
       analyzeLine(lines[lineIndex], lineIndex);
       analyzeLine("", lineIndex + 1);
+      setShowSuggestions(false);
+      setSelectedSuggestion(-1);
+      setSuggestionLine(-1);
       requestAnimationFrame(() => {
         // İmleci yeni satıra konumlandır
         const pos = lines.slice(0, lineIndex + 2).join("\n").length + 1;
@@ -182,6 +252,41 @@ export default function WordEditorPage() {
     return line.replace(/(\d+(?:\.?\d*)?\s*kcal)/gi, '<span style="color:#000;font-weight:bold;">$1</span>');
   }
 
+  // Helper: get caret position (line, column)
+  function getCaretLineCol(text, caretPos) {
+    const lines = text.slice(0, caretPos).split("\n");
+    return { line: lines.length - 1, col: lines[lines.length - 1].length };
+  }
+
+  // Helper: get suggestion menu position (absolute, below textarea line)
+  function getSuggestionMenuStyle() {
+    if (!textareaRef.current || suggestionLine < 0) return { display: 'none' };
+    // Try to position below the current line
+    const textarea = textareaRef.current;
+    const lineHeight = 32; // px, adjust as needed
+    const rect = textarea.getBoundingClientRect();
+    const scrollY = window.scrollY || window.pageYOffset;
+    const top = rect.top + scrollY + lineHeight * (suggestionLine + 1);
+    const left = rect.left + window.scrollX + 8; // padding
+    return {
+      position: 'absolute',
+      top: top + 'px',
+      left: left + 'px',
+      zIndex: 1000,
+      background: '#fff',
+      border: '1px solid #ddd',
+      borderRadius: '6px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+      minWidth: '220px',
+      maxWidth: '350px',
+      fontSize: '1rem',
+      padding: '2px 0',
+      display: showSuggestions && suggestions.length > 0 ? 'block' : 'none',
+      maxHeight: '180px',
+      overflowY: 'auto',
+    };
+  }
+
   return (
     <div className="flex justify-center items-start bg-gray-100 min-h-screen px-8"
       onMouseUp={e => {
@@ -208,6 +313,45 @@ export default function WordEditorPage() {
             style={{ resize: 'none' }}
             className="w-1/3 outline-none p-2 bg-white text-xl"
           />
+          {/* Suggestion dropdown menu */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div style={getSuggestionMenuStyle()}>
+              {suggestions.map((item, idx) => (
+                <div
+                  key={item.name}
+                  style={{
+                    padding: '4px 12px',
+                    background: idx === selectedSuggestion ? '#f0f0f0' : 'transparent',
+                    color: '#222',
+                    cursor: 'pointer',
+                    fontWeight: idx === selectedSuggestion ? 'bold' : 'normal',
+                    borderRadius: '4px',
+                  }}
+                  onMouseDown={e => {
+                    e.preventDefault();
+                    // Select on click
+                    const textarea = textareaRef.current;
+                    const val = textarea.value;
+                    const lines = val.split("\n");
+                    lines[suggestionLine] = item.name;
+                    const newText = lines.join("\n");
+                    setText(newText);
+                    setShowSuggestions(false);
+                    setSelectedSuggestion(-1);
+                    setSuggestionLine(-1);
+                    analyzeLine(item.name, suggestionLine);
+                    setTimeout(() => {
+                      const pos = lines.slice(0, suggestionLine + 1).join("\n").length;
+                      textarea.selectionStart = textarea.selectionEnd = pos;
+                    }, 0);
+                  }}
+                  onMouseEnter={() => setSelectedSuggestion(idx)}
+                >
+                  {item.name}
+                </div>
+              ))}
+            </div>
+          )}
           <div
             ref={resultsRef}
             className="w-2/3 outline-none p-2 bg-white text-gray-700 text-xl whitespace-pre-line select-text"
