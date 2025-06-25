@@ -5,18 +5,26 @@ import { useEffect, useState } from "react";
 export default function Home() {
   const [records, setRecords] = useState([]);
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+  const username = typeof window !== "undefined" ? localStorage.getItem("username") || "" : "";
+
+  function fetchHistory() {
+    if (!username) return;
+    fetch(`${baseUrl}/api/getHistory?username=${username}`)
+      .then((res) => res.json())
+      .then((data) => {
+        const recs = Array.isArray(data.records) ? data.records : data;
+        setRecords(recs || []);
+      })
+      .catch(() => {});
+  }
 
   useEffect(() => {
-    fetch(`${baseUrl}/api/records`)
-      .then((res) => res.json())
-      .then((data) => setRecords(Array.isArray(data) ? data : []))
-      .catch(() => {});
+    fetchHistory();
   }, [baseUrl]);
 
   function createRecord() {
     const recordName = prompt("Perhiz kaydının ismi");
-    if (!recordName) return;
-    const username = localStorage.getItem("username") || "kullanici_adi";
+    if (!recordName || !username) return;
     const payload = {
       username,
       records: [{ recordName, entries: [] }],
@@ -26,11 +34,7 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     })
-      .then((res) => res.json())
-      .then((data) => {
-        const rec = data.recordName ? data : { recordName };
-        setRecords((prev) => [...prev, rec]);
-      })
+      .then(() => fetchHistory())
       .catch(() => {});
   }
 
@@ -50,17 +54,26 @@ export default function Home() {
       </div>
       <button
         onClick={createRecord}
-        className="mb-4 px-4 py-2 bg-green-500 text-white rounded"
+        className="mb-6 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
       >
         Yeni Perhiz Kaydı
       </button>
-      <h2 className="text-xl font-semibold mb-2">Perhiz Kayıtları</h2>
-      <ul className="list-disc pl-5">
-        {records.length === 0 && <li>Henüz kayıt yok</li>}
-        {records.map((r, idx) => (
-          <li key={idx}>{r.recordName || r.name}</li>
-        ))}
-      </ul>
+      <h2 className="text-xl font-semibold mb-4 text-center">Perhiz Kayıtları</h2>
+      {records.length === 0 ? (
+        <div className="text-center text-gray-500">Henüz kayıt yok</div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {records.map((r) => (
+            <Link
+              key={r.recordName || r.name}
+              href={`/${username}/${encodeURIComponent(r.recordName || r.name)}`}
+              className="block p-4 border rounded shadow hover:bg-gray-50"
+            >
+              {r.recordName || r.name}
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import debounce from "lodash.debounce";
 import { extractAmount, fuzzyFind, detectUnit } from "@/app/home/analyzer";
 
-export default function WordEditorPage() {
+export default function WordEditor() {
   const [foodList, setFoodList] = useState([]);
   const [text, setText] = useState("");
   const [results, setResults] = useState([]); // Artık dizi
