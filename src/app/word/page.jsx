@@ -122,6 +122,61 @@ export default function WordEditorPage() {
     }
   }
 
+  function handlePaste(e) {
+    const paste = (e.clipboardData || window.clipboardData).getData('text');
+    if (!paste.includes('\n')) return; // Only handle multi-line paste
+    e.preventDefault();
+    const textarea = e.target;
+    const { selectionStart, selectionEnd, value } = textarea;
+    const before = value.slice(0, selectionStart);
+    const after = value.slice(selectionEnd);
+    const pastedLines = paste.split(/\r?\n/);
+    const beforeLines = before.split('\n');
+    const afterLines = after.split('\n');
+    // Merge pasted lines into the text
+    const newLines = [
+      ...beforeLines.slice(0, -1),
+      beforeLines[beforeLines.length - 1] + pastedLines[0],
+      ...pastedLines.slice(1, -1),
+      pastedLines.length > 1 ? pastedLines[pastedLines.length - 1] + afterLines[0] : afterLines[0],
+      ...afterLines.slice(1)
+    ];
+    const newText = newLines.join('\n');
+    setText(newText);
+    // Sync results array
+    setResults((prevResults) => {
+      const arr = prevResults.slice();
+      arr.length = newLines.length;
+      return arr;
+    });
+    // Analyze only the newly pasted lines
+    const startLine = beforeLines.length - 1;
+    for (let i = 0; i < pastedLines.length; i++) {
+      const lineIdx = startLine + i;
+      const lineVal = newLines[lineIdx];
+      if (lineVal && lineVal.trim() !== "") {
+        analyzeLine(lineVal, lineIdx);
+      } else {
+        setResults((prevResults) => {
+          const arr = prevResults.slice();
+          arr[lineIdx] = "";
+          return arr;
+        });
+      }
+    }
+    // Adjust textarea height
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+        textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+      }
+      if (resultsRef.current) {
+        resultsRef.current.style.height = 'auto';
+        resultsRef.current.style.height = resultsRef.current.scrollHeight + 'px';
+      }
+    }, 0);
+  }
+
   // Sonuç satırında kcal ifadesini sadece bold ve siyah yapan yardımcı fonksiyon
   function highlightCalories(line) {
     return line.replace(/(\d+(?:\.?\d*)?\s*kcal)/gi, '<span style="color:#000;font-weight:bold;">$1</span>');
@@ -149,6 +204,7 @@ export default function WordEditorPage() {
             value={text}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             style={{ resize: 'none' }}
             className="w-1/3 outline-none p-2 bg-white text-xl"
           />
