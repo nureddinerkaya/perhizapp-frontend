@@ -9,9 +9,27 @@ export default function WordEditorPage() {
   const foodList = useFoodList();
   const [text, setText] = useState("");
   const [results, setResults] = useState([]); // Artık dizi
+  const [lineValues, setLineValues] = useState([]); // per line numeric results
+  const [totals, setTotals] = useState({
+    gram: 0,
+    kcal: 0,
+    protein: 0,
+    carb: 0,
+    fiber: 0,
+  });
   const textareaRef = useRef(null);
   const resultsRef = useRef(null);
   const debouncedAnalyze = useRef(null);
+
+  function adjustTotals(delta) {
+    setTotals((t) => ({
+      gram: t.gram + (delta.gram || 0),
+      kcal: t.kcal + (delta.kcal || 0),
+      protein: t.protein + (delta.protein || 0),
+      carb: t.carb + (delta.carb || 0),
+      fiber: t.fiber + (delta.fiber || 0),
+    }));
+  }
 
   // Suggestion dropdown state
   const [suggestions, setSuggestions] = useState([]); // Array of food items
@@ -40,17 +58,47 @@ export default function WordEditorPage() {
   }, [foodList]);
 
   function analyzeLine(line, lineIndex) {
+    const matches = fuzzyFind(foodList, line);
+    let lineResult = null;
+    let display = "";
+    if (matches && matches.length) {
+      const item = matches[0];
+      const amt = extractAmount(line, item.portion);
+      lineResult = {
+        gram: amt,
+        kcal: (item.calorie * amt) / 100,
+        protein: (item.protein * amt) / 100,
+        carb: (item.carb * amt) / 100,
+        fiber: (item.fiber * amt) / 100,
+      };
+      display = `${formatNumber(amt)} g, ${formatNumber(lineResult.kcal)} kcal, ${formatNumber(lineResult.protein)} g protein, ${formatNumber(lineResult.carb)} g karbonhidrat, ${formatNumber(lineResult.fiber)} g lif`;
+    }
+
     setResults((prevResults) => {
       const resultLines = prevResults.slice();
-      const matches = fuzzyFind(foodList, line);
-      if (matches && matches.length) {
-        const item = matches[0];
-        const amt = extractAmount(line, item.portion);
-        resultLines[lineIndex] = `${formatNumber(amt)} g, ${formatNumber(item.calorie * amt / 100)} kcal, ${formatNumber(item.protein * amt / 100)} g protein, ${formatNumber(item.carb * amt / 100)} g karbonhidrat, ${formatNumber(item.fiber * amt / 100)} g lif`;
-      } else {
-        resultLines[lineIndex] = "";
-      }
+      resultLines[lineIndex] = display;
       return resultLines;
+    });
+
+    setLineValues((prev) => {
+      const arr = prev.slice();
+      const prevVal = arr[lineIndex];
+      if (prevVal) {
+        adjustTotals({
+          gram: -prevVal.gram,
+          kcal: -prevVal.kcal,
+          protein: -prevVal.protein,
+          carb: -prevVal.carb,
+          fiber: -prevVal.fiber,
+        });
+      }
+      if (lineResult) {
+        adjustTotals(lineResult);
+        arr[lineIndex] = lineResult;
+      } else {
+        arr[lineIndex] = null;
+      }
+      return arr;
     });
   }
 
@@ -69,6 +117,25 @@ export default function WordEditorPage() {
       arr.length = lines.length;
       return arr;
     });
+    setLineValues((prev) => {
+      const arr = prev.slice();
+      if (lines.length < arr.length) {
+        for (let i = lines.length; i < arr.length; i++) {
+          const val = arr[i];
+          if (val) {
+            adjustTotals({
+              gram: -val.gram,
+              kcal: -val.kcal,
+              protein: -val.protein,
+              carb: -val.carb,
+              fiber: -val.fiber,
+            });
+          }
+        }
+      }
+      arr.length = lines.length;
+      return arr;
+    });
     if (debouncedAnalyze.current) {
       if (currLine.trim() !== "") {
         debouncedAnalyze.current(currLine, lineIndex);
@@ -76,6 +143,20 @@ export default function WordEditorPage() {
         setResults((prevResults) => {
           const arr = prevResults.slice();
           arr[lineIndex] = "";
+          return arr;
+        });
+        setLineValues((prev) => {
+          const arr = prev.slice();
+          if (arr[lineIndex]) {
+            adjustTotals({
+              gram: -arr[lineIndex].gram,
+              kcal: -arr[lineIndex].kcal,
+              protein: -arr[lineIndex].protein,
+              carb: -arr[lineIndex].carb,
+              fiber: -arr[lineIndex].fiber,
+            });
+          }
+          arr[lineIndex] = null;
           return arr;
         });
         setShowSuggestions(false);
@@ -219,6 +300,25 @@ export default function WordEditorPage() {
       arr.length = newLines.length;
       return arr;
     });
+    setLineValues((prev) => {
+      const arr = prev.slice();
+      if (newLines.length < arr.length) {
+        for (let i = newLines.length; i < arr.length; i++) {
+          const val = arr[i];
+          if (val) {
+            adjustTotals({
+              gram: -val.gram,
+              kcal: -val.kcal,
+              protein: -val.protein,
+              carb: -val.carb,
+              fiber: -val.fiber,
+            });
+          }
+        }
+      }
+      arr.length = newLines.length;
+      return arr;
+    });
     // Analyze only the newly pasted lines
     const startLine = beforeLines.length - 1;
     for (let i = 0; i < pastedLines.length; i++) {
@@ -230,6 +330,20 @@ export default function WordEditorPage() {
         setResults((prevResults) => {
           const arr = prevResults.slice();
           arr[lineIdx] = "";
+          return arr;
+        });
+        setLineValues((prev) => {
+          const arr = prev.slice();
+          if (arr[lineIdx]) {
+            adjustTotals({
+              gram: -arr[lineIdx].gram,
+              kcal: -arr[lineIdx].kcal,
+              protein: -arr[lineIdx].protein,
+              carb: -arr[lineIdx].carb,
+              fiber: -arr[lineIdx].fiber,
+            });
+          }
+          arr[lineIdx] = null;
           return arr;
         });
       }
@@ -303,8 +417,9 @@ export default function WordEditorPage() {
       }}
     >
       <div className="relative flex w-full justify-center">
-        <div className="bg-white w-full max-w-[1100px] min-h-screen h-auto shadow p-8 flex flex-row gap-4">
-          <textarea
+        <div className="bg-white w-full max-w-[1100px] min-h-screen h-auto shadow p-8 flex flex-col">
+          <div className="flex flex-row gap-4">
+            <textarea
             ref={textareaRef}
             value={text}
             onChange={handleChange}
@@ -366,6 +481,13 @@ export default function WordEditorPage() {
               }
             }}
           />
+          </div>
+          <div className="flex w-full mt-8 text-xl">
+            <div className="w-1/3">Toplam:</div>
+            <div className="w-2/3">
+              {`${formatNumber(totals.gram)} g, ${formatNumber(totals.kcal)} kcal, ${formatNumber(totals.protein)} g protein, ${formatNumber(totals.carb)} g karbonhidrat, ${formatNumber(totals.fiber)} g lif`}
+            </div>
+          </div>
         </div>
       </div>
     </div>
