@@ -6,7 +6,7 @@ import { extractAmount, fuzzyFind, detectUnit } from "@/app/home/analyzer";
 export default function WordEditorPage() {
   const [foodList, setFoodList] = useState([]);
   const [text, setText] = useState("");
-  const [info, setInfo] = useState("");
+  const [results, setResults] = useState("");
   const [panelTop, setPanelTop] = useState(0);
   const textareaRef = useRef(null);
   const debouncedAnalyze = useRef(null);
@@ -31,21 +31,35 @@ export default function WordEditorPage() {
     return parseFloat(val.toFixed(2)).toString();
   }
 
-  function analyzeLine(line) {
-    const matches = fuzzyFind(foodList, line);
-    if (matches && matches.length) {
-      const item = matches[0];
-      const amt = extractAmount(line, item.portion);
-      setInfo(
-        `${formatNumber(amt)} gram, ${formatNumber(item.calorie * amt / 100)} kcal, ${formatNumber(
-          item.protein * amt / 100
-        )} g protein, ${formatNumber(item.carb * amt / 100)} g karbonhidrat, ${formatNumber(
-          item.fiber * amt / 100
-        )} g lif`
-      );
-    } else {
-      setInfo("");
-    }
+  function analyzeLine(line, lineIndex) {
+    setResults((prevResults) => {
+      const resultLines = prevResults.split("\n");
+      const matches = fuzzyFind(foodList, line);
+      if (matches && matches.length) {
+        const item = matches[0];
+        const amt = extractAmount(line, item.portion);
+        resultLines[lineIndex] = `${formatNumber(amt)} gram, ${formatNumber(item.calorie * amt / 100)} kcal, ${formatNumber(item.protein * amt / 100)} g protein, ${formatNumber(item.carb * amt / 100)} g karbonhidrat, ${formatNumber(item.fiber * amt / 100)} g lif`;
+      } else {
+        resultLines[lineIndex] = "";
+      }
+      return resultLines.join("\n");
+    });
+  }
+
+  function analyzeAllLines(text) {
+    const lines = text.split("\n");
+    const resultLines = lines.map((line) => {
+      if (!line.trim()) return "";
+      const matches = fuzzyFind(foodList, line);
+      if (matches && matches.length) {
+        const item = matches[0];
+        const amt = extractAmount(line, item.portion);
+        return `${formatNumber(amt)} gram, ${formatNumber(item.calorie * amt / 100)} kcal, ${formatNumber(item.protein * amt / 100)} g protein, ${formatNumber(item.carb * amt / 100)} g karbonhidrat, ${formatNumber(item.fiber * amt / 100)} g lif`;
+      } else {
+        return "";
+      }
+    });
+    setResults(resultLines.join("\n"));
   }
 
   const lineHeight = 24; // approximate line height in px
@@ -62,11 +76,20 @@ export default function WordEditorPage() {
   function handleChange(e) {
     const val = e.target.value;
     setText(val);
-    const currLine = updatePanelPosition(e.target);
-    if (currLine.trim() === "") {
-      setInfo("");
-    } else if (debouncedAnalyze.current) {
-      debouncedAnalyze.current(currLine);
+    const textarea = e.target;
+    const { selectionStart, value } = textarea;
+    const before = value.slice(0, selectionStart);
+    const lineIndex = before.split("\n").length - 1;
+    const lines = value.split("\n");
+    const currLine = lines[lineIndex] || "";
+    // Sadece değişen satırı analiz et
+    analyzeLine(currLine, lineIndex);
+    updatePanelPosition(textarea);
+    if (debouncedAnalyze.current) {
+      const currLine = updatePanelPosition(e.target);
+      if (currLine.trim() !== "") {
+        debouncedAnalyze.current(currLine);
+      }
     }
   }
 
@@ -93,37 +116,40 @@ export default function WordEditorPage() {
           portionVal = Number.isInteger(portionVal) ? portionVal : portionVal.toFixed(2);
           phrase = `${portionVal} porsiyon ${item.name}`;
         }
-        const nutrition = `${formatNumber(amt)} gram, ${formatNumber(item.calorie * amt / 100)} kcal, ${formatNumber(item.protein * amt / 100)} g protein, ${formatNumber(item.carb * amt / 100)} g karbonhidrat, ${formatNumber(item.fiber * amt / 100)} g lif`;
-        lines[lineIndex] = `${phrase} (${nutrition})`;
+        lines[lineIndex] = phrase;
       }
-      const newText = lines.join("\n") + "\n";
+      // Alt satıra geçmek için ilgili yere boş satır ekle
+      lines.splice(lineIndex + 1, 0, "");
+      const newText = lines.join("\n");
       setText(newText);
+      analyzeAllLines(newText);
       requestAnimationFrame(() => {
-        const pos = lines.slice(0, lineIndex + 1).join("\n").length + 1;
+        // İmleci yeni satıra konumlandır
+        const pos = lines.slice(0, lineIndex + 2).join("\n").length + 1;
         textarea.selectionStart = textarea.selectionEnd = pos;
-        setPanelTop((lineIndex + 1) * lineHeight - textarea.scrollTop);
+        setPanelTop((lineIndex + 2) * lineHeight - textarea.scrollTop);
       });
-      setInfo("");
     }
   }
 
   return (
-    <div className="flex justify-center p-8 bg-gray-100 min-h-screen">
-      <div className="relative flex">
-        <div className="bg-white w-[595px] min-h-[842px] shadow p-8">
+    <div className="flex justify-center items-center p-8 bg-gray-100 min-h-screen">
+      <div className="relative flex w-full justify-center">
+        <div className="bg-white w-full max-w-[1100px] min-h-[80vh] h-auto shadow p-8 flex flex-row gap-4">
           <textarea
             ref={textareaRef}
             value={text}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            className="w-full h-full outline-none resize-none"
+            style={{ minHeight: '70vh', height: 'auto', overflowY: 'auto', resize: 'none' }}
+            className="w-1/3 outline-none p-2 bg-white"
           />
-        </div>
-        <div
-          style={{ top: panelTop }}
-          className={`absolute left-full ml-4 w-64 bg-white shadow p-4 h-min whitespace-pre-line ${info ? "" : "hidden"}`}
-        >
-          {info}
+          <textarea
+            value={results}
+            readOnly
+            style={{ minHeight: '70vh', height: 'auto', overflowY: 'auto', resize: 'none' }}
+            className="w-2/3 outline-none p-2 bg-white text-gray-700"
+          />
         </div>
       </div>
     </div>
