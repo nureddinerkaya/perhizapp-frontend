@@ -6,7 +6,7 @@ import { extractAmount, fuzzyFind, detectUnit } from "@/app/home/analyzer";
 export default function WordEditorPage() {
   const [foodList, setFoodList] = useState([]);
   const [text, setText] = useState("");
-  const [info, setInfo] = useState("");
+  const [info, setInfo] = useState(null);
   const [panelTop, setPanelTop] = useState(0);
   const textareaRef = useRef(null);
   const debouncedAnalyze = useRef(null);
@@ -36,15 +36,23 @@ export default function WordEditorPage() {
     if (matches && matches.length) {
       const item = matches[0];
       const amt = extractAmount(line, item.portion);
-      setInfo(
-        `${formatNumber(amt)} gram, ${formatNumber(item.calorie * amt / 100)} kcal, ${formatNumber(
-          item.protein * amt / 100
-        )} g protein, ${formatNumber(item.carb * amt / 100)} g karbonhidrat, ${formatNumber(
-          item.fiber * amt / 100
-        )} g lif`
-      );
+      const unit = detectUnit(line);
+      let phrase = "";
+      if (unit === "gram") {
+        phrase = `${formatNumber(amt)} gram ${item.name}`;
+      } else {
+        let portionVal = amt / (item.portion || 100);
+        portionVal = Number.isInteger(portionVal) ? portionVal : portionVal.toFixed(2);
+        phrase = `${portionVal} porsiyon ${item.name}`;
+      }
+      const nutrition = `${formatNumber(item.calorie * amt / 100)} kcal, ${formatNumber(
+        item.protein * amt / 100
+      )} g protein, ${formatNumber(item.carb * amt / 100)} g karbonhidrat, ${formatNumber(
+        item.fat * amt / 100
+      )} g yağ`;
+      setInfo({ phrase, nutrition });
     } else {
-      setInfo("");
+      setInfo(null);
     }
   }
 
@@ -64,7 +72,7 @@ export default function WordEditorPage() {
     setText(val);
     const currLine = updatePanelPosition(e.target);
     if (currLine.trim() === "") {
-      setInfo("");
+      setInfo(null);
     } else if (debouncedAnalyze.current) {
       debouncedAnalyze.current(currLine);
     }
@@ -103,7 +111,7 @@ export default function WordEditorPage() {
         textarea.selectionStart = textarea.selectionEnd = pos;
         setPanelTop((lineIndex + 1) * lineHeight - textarea.scrollTop);
       });
-      setInfo("");
+      setInfo(null);
     }
   }
 
@@ -121,9 +129,14 @@ export default function WordEditorPage() {
         </div>
         <div
           style={{ top: panelTop }}
-          className={`absolute left-full ml-4 w-64 bg-white shadow p-4 h-min whitespace-pre-line ${info ? "" : "hidden"}`}
+          className={`absolute left-full ml-4 w-[600px] bg-white shadow p-4 h-min ${info ? "" : "hidden"}`}
         >
-          {info}
+          {info && (
+            <div className="flex justify-between whitespace-nowrap w-full">
+              <span className="text-left">{info.phrase}</span>
+              <span className="text-right">{info.nutrition}</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
