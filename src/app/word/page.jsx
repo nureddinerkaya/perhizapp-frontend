@@ -6,10 +6,11 @@ import { extractAmount, fuzzyFind, detectUnit } from "@/app/home/analyzer";
 export default function WordEditorPage() {
   const [foodList, setFoodList] = useState([]);
   const [text, setText] = useState("");
-  const [info, setInfo] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [panelTop, setPanelTop] = useState(0);
   const textareaRef = useRef(null);
-  const debouncedAnalyze = useRef(null);
+  const debouncedSuggest = useRef(null);
 
   useEffect(() => {
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -19,10 +20,12 @@ export default function WordEditorPage() {
   }, []);
 
   useEffect(() => {
-    debouncedAnalyze.current = debounce((line) => {
-      analyzeLine(line);
-    }, 400);
-    return () => debouncedAnalyze.current && debouncedAnalyze.current.cancel();
+    debouncedSuggest.current = debounce((line) => {
+      const matches = fuzzyFind(foodList, line);
+      setSuggestions(matches.slice(0, 5));
+      setSelectedIndex(0);
+    }, 300);
+    return () => debouncedSuggest.current && debouncedSuggest.current.cancel();
   }, [foodList]);
 
   function formatNumber(val) {
@@ -31,20 +34,22 @@ export default function WordEditorPage() {
     return parseFloat(val.toFixed(2)).toString();
   }
 
-  function analyzeLine(line) {
-    const matches = fuzzyFind(foodList, line);
+  function replaceLineWithInfo(lineIndex, rawLine, lines) {
+    const matches = fuzzyFind(foodList, rawLine);
     if (matches && matches.length) {
       const item = matches[0];
-      const amt = extractAmount(line, item.portion);
-      setInfo(
-        `${formatNumber(amt)} gram, ${formatNumber(item.calorie * amt / 100)} kcal, ${formatNumber(
-          item.protein * amt / 100
-        )} g protein, ${formatNumber(item.carb * amt / 100)} g karbonhidrat, ${formatNumber(
-          item.fiber * amt / 100
-        )} g lif`
-      );
-    } else {
-      setInfo("");
+      const amt = extractAmount(rawLine, item.portion);
+      const unit = detectUnit(rawLine);
+      let phrase = "";
+      if (unit === "gram") {
+        phrase = `${formatNumber(amt)} gram ${item.name}`;
+      } else {
+        let portionVal = amt / (item.portion || 100);
+        portionVal = Number.isInteger(portionVal) ? portionVal : portionVal.toFixed(2);
+        phrase = `${portionVal} porsiyon ${item.name}`;
+      }
+      const nutrition = `${formatNumber(amt)} gram, ${formatNumber(item.calorie * amt / 100)} kcal, ${formatNumber(item.protein * amt / 100)} g protein, ${formatNumber(item.carb * amt / 100)} g karbonhidrat, ${formatNumber(item.fiber * amt / 100)} g lif`;
+      lines[lineIndex] = `${phrase} (${nutrition})`;
     }
   }
 
@@ -59,43 +64,76 @@ export default function WordEditorPage() {
     return currentLine;
   }
 
+  function replaceCurrentLineWithItem(item) {
+    const textarea = textareaRef.current;
+    const val = textarea.value;
+    const before = val.slice(0, textarea.selectionStart);
+    const lines = val.split("\n");
+    const lineIndex = before.split("\n").length - 1;
+    const rawLine = lines[lineIndex];
+    const amt = extractAmount(rawLine, item.portion);
+    const unit = detectUnit(rawLine);
+    let phrase = "";
+    if (unit === "gram") {
+      phrase = `${formatNumber(amt)} gram ${item.name}`;
+    } else {
+      let portionVal = amt / (item.portion || 100);
+      portionVal = Number.isInteger(portionVal) ? portionVal : portionVal.toFixed(2);
+      phrase = `${portionVal} porsiyon ${item.name}`;
+    }
+    lines[lineIndex] = phrase;
+    const newText = lines.join("\n");
+    setText(newText);
+    requestAnimationFrame(() => {
+      const pos = lines.slice(0, lineIndex + 1).join("\n").length;
+      textarea.selectionStart = textarea.selectionEnd = pos;
+      setPanelTop(lineIndex * lineHeight - textarea.scrollTop);
+    });
+  }
+
   function handleChange(e) {
     const val = e.target.value;
     setText(val);
     const currLine = updatePanelPosition(e.target);
     if (currLine.trim() === "") {
-      setInfo("");
-    } else if (debouncedAnalyze.current) {
-      debouncedAnalyze.current(currLine);
+      setSuggestions([]);
+    } else if (debouncedSuggest.current) {
+      debouncedSuggest.current(currLine);
     }
   }
 
   function handleKeyDown(e) {
+    const textarea = textareaRef.current;
+    if (suggestions.length) {
+      if (e.key === "ArrowDown" || (e.key === "Tab" && !e.shiftKey)) {
+        e.preventDefault();
+        setSelectedIndex((selectedIndex + 1) % suggestions.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIndex((selectedIndex - 1 + suggestions.length) % suggestions.length);
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const item = suggestions[selectedIndex];
+        if (item) {
+          replaceCurrentLineWithItem(item);
+          setSuggestions([]);
+        }
+        return;
+      }
+    }
+
     if (e.key === "Enter") {
       e.preventDefault();
-      if (debouncedAnalyze.current) debouncedAnalyze.current.cancel();
-      const textarea = textareaRef.current;
       const val = textarea.value;
       const before = val.slice(0, textarea.selectionStart);
       const lines = val.split("\n");
       const lineIndex = before.split("\n").length - 1;
       const rawLine = lines[lineIndex];
-      const matches = fuzzyFind(foodList, rawLine);
-      if (matches && matches.length) {
-        const item = matches[0];
-        const amt = extractAmount(rawLine, item.portion);
-        const unit = detectUnit(rawLine);
-        let phrase = "";
-        if (unit === "gram") {
-          phrase = `${formatNumber(amt)} gram ${item.name}`;
-        } else {
-          let portionVal = amt / (item.portion || 100);
-          portionVal = Number.isInteger(portionVal) ? portionVal : portionVal.toFixed(2);
-          phrase = `${portionVal} porsiyon ${item.name}`;
-        }
-        const nutrition = `${formatNumber(amt)} gram, ${formatNumber(item.calorie * amt / 100)} kcal, ${formatNumber(item.protein * amt / 100)} g protein, ${formatNumber(item.carb * amt / 100)} g karbonhidrat, ${formatNumber(item.fiber * amt / 100)} g lif`;
-        lines[lineIndex] = `${phrase} (${nutrition})`;
-      }
+      replaceLineWithInfo(lineIndex, rawLine, lines);
       const newText = lines.join("\n") + "\n";
       setText(newText);
       requestAnimationFrame(() => {
@@ -103,7 +141,7 @@ export default function WordEditorPage() {
         textarea.selectionStart = textarea.selectionEnd = pos;
         setPanelTop((lineIndex + 1) * lineHeight - textarea.scrollTop);
       });
-      setInfo("");
+      setSuggestions([]);
     }
   }
 
@@ -119,12 +157,26 @@ export default function WordEditorPage() {
             className="w-full h-full outline-none resize-none"
           />
         </div>
-        <div
-          style={{ top: panelTop }}
-          className={`absolute left-full ml-4 w-64 bg-white shadow p-4 h-min whitespace-pre-line ${info ? "" : "hidden"}`}
-        >
-          {info}
-        </div>
+        {suggestions.length > 0 && (
+          <ul
+            style={{ top: panelTop }}
+            className="absolute left-full ml-4 w-64 bg-white shadow rounded max-h-60 overflow-y-auto z-10"
+          >
+            {suggestions.map((item, idx) => (
+              <li
+                key={item.name}
+                className={`p-2 cursor-pointer ${idx === selectedIndex ? "bg-gray-200" : ""}`}
+                onMouseDown={(ev) => {
+                  ev.preventDefault();
+                  replaceCurrentLineWithItem(item);
+                  setSuggestions([]);
+                }}
+              >
+                {item.name}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
