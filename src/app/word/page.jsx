@@ -1,23 +1,17 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import debounce from "lodash.debounce";
+import useFoodList from "@/app/useFoodList";
+import { formatNumber } from "@/app/utils";
 import { extractAmount, fuzzyFind, detectUnit } from "@/app/home/analyzer";
 
 export default function WordEditorPage() {
-  const [foodList, setFoodList] = useState([]);
+  const foodList = useFoodList();
   const [text, setText] = useState("");
   const [results, setResults] = useState([]); // Artık dizi
-  const [panelTop, setPanelTop] = useState(0);
   const textareaRef = useRef(null);
   const resultsRef = useRef(null);
   const debouncedAnalyze = useRef(null);
-
-  useEffect(() => {
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
-    fetch(`${baseUrl}/api/food/getAll`)
-      .then((res) => res.json())
-      .then((data) => setFoodList(data));
-  }, []);
 
   useEffect(() => {
     debouncedAnalyze.current = debounce((line, lineIndex) => {
@@ -25,12 +19,6 @@ export default function WordEditorPage() {
     }, 400);
     return () => debouncedAnalyze.current && debouncedAnalyze.current.cancel();
   }, [foodList]);
-
-  function formatNumber(val) {
-    if (typeof val !== "number" || isNaN(val)) return "";
-    if (Number.isInteger(val)) return val.toString();
-    return parseFloat(val.toFixed(2)).toString();
-  }
 
   function analyzeLine(line, lineIndex) {
     setResults((prevResults) => {
@@ -47,16 +35,7 @@ export default function WordEditorPage() {
     });
   }
 
-  const lineHeight = 24; // approximate line height in px
 
-  function updatePanelPosition(textarea) {
-    const { selectionStart, scrollTop, value } = textarea;
-    const before = value.slice(0, selectionStart);
-    const lineIndex = before.split("\n").length - 1;
-    const currentLine = before.split("\n").pop();
-    setPanelTop(lineIndex * lineHeight - scrollTop);
-    return currentLine;
-  }
 
   function handleChange(e) {
     const val = e.target.value;
@@ -73,7 +52,6 @@ export default function WordEditorPage() {
       arr.length = lines.length;
       return arr;
     });
-    updatePanelPosition(textarea);
     if (debouncedAnalyze.current) {
       if (currLine.trim() !== "") {
         debouncedAnalyze.current(currLine, lineIndex);
@@ -101,7 +79,6 @@ export default function WordEditorPage() {
       if (debouncedAnalyze.current) debouncedAnalyze.current.cancel();
       const textarea = textareaRef.current;
       const val = textarea.value;
-      const atEnd = textarea.selectionStart === val.length;
       const before = val.slice(0, textarea.selectionStart);
       const lines = val.split("\n");
       const lineIndex = before.split("\n").length - 1;
@@ -132,7 +109,6 @@ export default function WordEditorPage() {
         // İmleci yeni satıra konumlandır
         const pos = lines.slice(0, lineIndex + 2).join("\n").length + 1;
         textarea.selectionStart = textarea.selectionEnd = pos;
-        setPanelTop((lineIndex + 2) * lineHeight - textarea.scrollTop);
         // textarea yüksekliğini ayarla
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto';
@@ -144,6 +120,61 @@ export default function WordEditorPage() {
         }
       });
     }
+  }
+
+  function handlePaste(e) {
+    const paste = (e.clipboardData || window.clipboardData).getData('text');
+    if (!paste.includes('\n')) return; // Only handle multi-line paste
+    e.preventDefault();
+    const textarea = e.target;
+    const { selectionStart, selectionEnd, value } = textarea;
+    const before = value.slice(0, selectionStart);
+    const after = value.slice(selectionEnd);
+    const pastedLines = paste.split(/\r?\n/);
+    const beforeLines = before.split('\n');
+    const afterLines = after.split('\n');
+    // Merge pasted lines into the text
+    const newLines = [
+      ...beforeLines.slice(0, -1),
+      beforeLines[beforeLines.length - 1] + pastedLines[0],
+      ...pastedLines.slice(1, -1),
+      pastedLines.length > 1 ? pastedLines[pastedLines.length - 1] + afterLines[0] : afterLines[0],
+      ...afterLines.slice(1)
+    ];
+    const newText = newLines.join('\n');
+    setText(newText);
+    // Sync results array
+    setResults((prevResults) => {
+      const arr = prevResults.slice();
+      arr.length = newLines.length;
+      return arr;
+    });
+    // Analyze only the newly pasted lines
+    const startLine = beforeLines.length - 1;
+    for (let i = 0; i < pastedLines.length; i++) {
+      const lineIdx = startLine + i;
+      const lineVal = newLines[lineIdx];
+      if (lineVal && lineVal.trim() !== "") {
+        analyzeLine(lineVal, lineIdx);
+      } else {
+        setResults((prevResults) => {
+          const arr = prevResults.slice();
+          arr[lineIdx] = "";
+          return arr;
+        });
+      }
+    }
+    // Adjust textarea height
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+        textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+      }
+      if (resultsRef.current) {
+        resultsRef.current.style.height = 'auto';
+        resultsRef.current.style.height = resultsRef.current.scrollHeight + 'px';
+      }
+    }, 0);
   }
 
   // Sonuç satırında kcal ifadesini sadece bold ve siyah yapan yardımcı fonksiyon
@@ -173,6 +204,7 @@ export default function WordEditorPage() {
             value={text}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             style={{ resize: 'none' }}
             className="w-1/3 outline-none p-2 bg-white text-xl"
           />

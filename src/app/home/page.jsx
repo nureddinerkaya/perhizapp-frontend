@@ -2,11 +2,13 @@
 
 import { useEffect, useState, useRef } from "react";
 import debounce from "lodash.debounce";
+import useFoodList from "@/app/useFoodList";
+import { formatNumber } from "@/app/utils";
 import { extractAmount, fuzzyFind, detectUnit } from "@/app/home/analyzer";
 
 
 export default function FoodNLPPage() {
-  const [foodList, setFoodList] = useState([]);
+  const foodList = useFoodList();
   const [input, setInput] = useState("");
   const [result, setResult] = useState(null);
   const [amount, setAmount] = useState(100);
@@ -64,13 +66,7 @@ export default function FoodNLPPage() {
     setSuggestions([]);
   }
 
-  // Fetch food list on mount
-  useEffect(() => {
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
-    fetch(`${baseUrl}/api/food/getAll`)
-      .then((res) => res.json())
-      .then((data) => setFoodList(data));
-  }, []);
+
 
   //EXAMPLE foodList FORMAT
 /*
@@ -104,12 +100,7 @@ export default function FoodNLPPage() {
   },
 */
 
-  // Helper to format numbers with up to 2 decimals, but no trailing zeros
-  function formatNumber(val) {
-    if (typeof val !== "number" || isNaN(val)) return "";
-    if (Number.isInteger(val)) return val.toString();
-    return parseFloat(val.toFixed(2)).toString();
-  }
+
 
   return (
       <div className="max-w-xl mx-auto p-4">
