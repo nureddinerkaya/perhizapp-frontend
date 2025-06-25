@@ -6,7 +6,7 @@ import { extractAmount, fuzzyFind, detectUnit } from "@/app/home/analyzer";
 export default function WordEditorPage() {
   const [foodList, setFoodList] = useState([]);
   const [text, setText] = useState("");
-  const [results, setResults] = useState("");
+  const [results, setResults] = useState([]); // Artık dizi
   const [panelTop, setPanelTop] = useState(0);
   const textareaRef = useRef(null);
   const resultsRef = useRef(null);
@@ -20,8 +20,8 @@ export default function WordEditorPage() {
   }, []);
 
   useEffect(() => {
-    debouncedAnalyze.current = debounce((line) => {
-      analyzeLine(line);
+    debouncedAnalyze.current = debounce((line, lineIndex) => {
+      analyzeLine(line, lineIndex);
     }, 400);
     return () => debouncedAnalyze.current && debouncedAnalyze.current.cancel();
   }, [foodList]);
@@ -34,33 +34,17 @@ export default function WordEditorPage() {
 
   function analyzeLine(line, lineIndex) {
     setResults((prevResults) => {
-      const resultLines = prevResults.split("\n");
+      const resultLines = prevResults.slice();
       const matches = fuzzyFind(foodList, line);
       if (matches && matches.length) {
         const item = matches[0];
         const amt = extractAmount(line, item.portion);
-        resultLines[lineIndex] = `${formatNumber(amt)} gram, ${formatNumber(item.calorie * amt / 100)} kcal, ${formatNumber(item.protein * amt / 100)} g protein, ${formatNumber(item.carb * amt / 100)} g karbonhidrat, ${formatNumber(item.fiber * amt / 100)} g lif`;
+        resultLines[lineIndex] = `${formatNumber(amt)} g, ${formatNumber(item.calorie * amt / 100)} kcal, ${formatNumber(item.protein * amt / 100)} g protein, ${formatNumber(item.carb * amt / 100)} g karbonhidrat, ${formatNumber(item.fiber * amt / 100)} g lif`;
       } else {
         resultLines[lineIndex] = "";
       }
-      return resultLines.join("\n");
+      return resultLines;
     });
-  }
-
-  function analyzeAllLines(text) {
-    const lines = text.split("\n");
-    const resultLines = lines.map((line) => {
-      if (!line.trim()) return "";
-      const matches = fuzzyFind(foodList, line);
-      if (matches && matches.length) {
-        const item = matches[0];
-        const amt = extractAmount(line, item.portion);
-        return `${formatNumber(amt)} gram, ${formatNumber(item.calorie * amt / 100)} kcal, ${formatNumber(item.protein * amt / 100)} g protein, ${formatNumber(item.carb * amt / 100)} g karbonhidrat, ${formatNumber(item.fiber * amt / 100)} g lif`;
-      } else {
-        return "";
-      }
-    });
-    setResults(resultLines.join("\n"));
   }
 
   const lineHeight = 24; // approximate line height in px
@@ -83,16 +67,24 @@ export default function WordEditorPage() {
     const lineIndex = before.split("\n").length - 1;
     const lines = value.split("\n");
     const currLine = lines[lineIndex] || "";
-    // Sadece değişen satırı analiz et
-    analyzeLine(currLine, lineIndex);
+    // Sonuç dizisini satır sayısına göre senkronize et
+    setResults((prevResults) => {
+      const arr = prevResults.slice();
+      arr.length = lines.length;
+      return arr;
+    });
     updatePanelPosition(textarea);
     if (debouncedAnalyze.current) {
-      const currLine = updatePanelPosition(e.target);
       if (currLine.trim() !== "") {
-        debouncedAnalyze.current(currLine);
+        debouncedAnalyze.current(currLine, lineIndex);
+      } else {
+        setResults((prevResults) => {
+          const arr = prevResults.slice();
+          arr[lineIndex] = "";
+          return arr;
+        });
       }
     }
-    // textarea yüksekliğini ayarla
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
@@ -154,8 +146,26 @@ export default function WordEditorPage() {
     }
   }
 
+  // Sonuç satırında kcal ifadesini sadece bold ve siyah yapan yardımcı fonksiyon
+  function highlightCalories(line) {
+    return line.replace(/(\d+(?:\.?\d*)?\s*kcal)/gi, '<span style="color:#000;font-weight:bold;">$1</span>');
+  }
+
   return (
-    <div className="flex justify-center items-start bg-gray-100 min-h-screen px-8">
+    <div className="flex justify-center items-start bg-gray-100 min-h-screen px-8"
+      onMouseUp={e => {
+        // Sadece textarea veya sonuçlar divi dışında bir yere tıklanırsa textarea'ya odaklan
+        if (
+          textareaRef.current &&
+          e.target !== textareaRef.current &&
+          e.target !== resultsRef.current &&
+          window.getSelection && window.getSelection().toString().length === 0
+        ) {
+          e.preventDefault();
+          textareaRef.current.focus();
+        }
+      }}
+    >
       <div className="relative flex w-full justify-center">
         <div className="bg-white w-full max-w-[1100px] min-h-screen h-auto shadow p-8 flex flex-row gap-4">
           <textarea
@@ -166,12 +176,19 @@ export default function WordEditorPage() {
             style={{ resize: 'none' }}
             className="w-1/3 outline-none p-2 bg-white text-xl"
           />
-          <textarea
+          <div
             ref={resultsRef}
-            value={results}
-            readOnly
-            style={{ resize: 'none' }}
-            className="w-2/3 outline-none p-2 bg-white text-gray-700 text-xl"
+            className="w-2/3 outline-none p-2 bg-white text-gray-700 text-xl whitespace-pre-line select-text"
+            style={{ minHeight: '100px' }}
+            dangerouslySetInnerHTML={{
+              __html: results.map(highlightCalories).join("\n")
+            }}
+            onMouseUp={e => {
+              // Sadece tıklama ise textarea'ya odaklan, ama metin seçiliyorsa odaklanma
+              if (window.getSelection && window.getSelection().toString().length === 0) {
+                if (textareaRef.current) textareaRef.current.focus();
+              }
+            }}
           />
         </div>
       </div>

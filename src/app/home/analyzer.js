@@ -113,13 +113,19 @@ export function normalizeInput(input) {
 }
 
 // Fuzzy find using Fuse.js: returns up to `limit` matching food items
+let cachedFoodList = null;
+let cachedFoodsArray = null;
+let cachedFuse = null;
+
 export function fuzzyFind(foodList, input, limit = 5, tokenScoreThreshold = 0.3) {
   const normalizedInput = normalizeInput(input);
   if (!normalizedInput || !foodList || normalizedInput.length < 2) return [];
 
   const cleanedInput = stripAmountKeywords(normalizedInput);
 
-  const foodsArray = Array.isArray(foodList)
+  // Only rebuild foodsArray and Fuse if foodList changed
+  if (foodList !== cachedFoodList) {
+    cachedFoodsArray = Array.isArray(foodList)
       ? foodList.map((item) => ({
           ...item,
           normalizedName: normalizeInput(item.name),
@@ -128,94 +134,96 @@ export function fuzzyFind(foodList, input, limit = 5, tokenScoreThreshold = 0.3)
           ...item,
           normalizedName: normalizeInput(item.name),
         }));
+    cachedFuse = new Fuse(cachedFoodsArray, {
+      keys: ["normalizedName"],
+      threshold: 0.4,
+      includeScore: true,
+      ignoreLocation: true,
+      minMatchCharLength: 2,
+    });
+    cachedFoodList = foodList;
+  }
+  const fuse = cachedFuse;
 
-  const fuse = new Fuse(foodsArray, {
-    keys: ["normalizedName"],
-    threshold: 0.4,
-    includeScore: true,
-    ignoreLocation: true,
-    minMatchCharLength: 2,
+  // Split the cleaned input into tokens (words)
+  const tokens = cleanedInput.split(/\s+/).filter(Boolean);
+
+  // Helper to get all 2- and 3-word combinations from tokens
+  function getCombinations(arr, comboLength) {
+    const results = [];
+    for (let i = 0; i <= arr.length - comboLength; i++) {
+      results.push(arr.slice(i, i + comboLength).join(" "));
+    }
+    return results;
+  }
+
+  // Get all 2- and 3-word combinations
+  const twoWordCombos = getCombinations(tokens, 2);
+  const threeWordCombos = getCombinations(tokens, 3);
+
+  // Filter tokens: keep only those where the best match score is below the threshold
+  const filteredTokens = tokens.filter((t) => {
+    const res = fuse.search(t);
+    const top = res.length ? res[0].score : 1;
+    return top <= tokenScoreThreshold;
   });
 
-// Split the cleaned input into tokens (words)
-const tokens = cleanedInput.split(/\s+/).filter(Boolean);
+  // Build the search queries: filtered tokens, 2-word, 3-word combos, and full input
+  const searchQueries = [
+    ...(filteredTokens.length ? [filteredTokens.join(" ")] : []),
+    ...twoWordCombos,
+    ...threeWordCombos,
+    cleanedInput,
+  ].filter(Boolean);
 
-// Helper to get all 2- and 3-word combinations from tokens
-function getCombinations(arr, comboLength) {
-  const results = [];
-  for (let i = 0; i <= arr.length - comboLength; i++) {
-    results.push(arr.slice(i, i + comboLength).join(" "));
-  }
-  return results;
-}
-
-// Get all 2- and 3-word combinations
-const twoWordCombos = getCombinations(tokens, 2);
-const threeWordCombos = getCombinations(tokens, 3);
-
-// Filter tokens: keep only those where the best match score is below the threshold
-const filteredTokens = tokens.filter((t) => {
-  const res = fuse.search(t);
-  const top = res.length ? res[0].score : 1;
-  return top <= tokenScoreThreshold;
-});
-
-// Build the search queries: filtered tokens, 2-word, 3-word combos, and full input
-const searchQueries = [
-  ...(filteredTokens.length ? [filteredTokens.join(" ")] : []),
-  ...twoWordCombos,
-  ...threeWordCombos,
-  cleanedInput,
-].filter(Boolean);
-
-// Perform fuzzy search for each query, collect all results
-let allResults = [];
-for (const query of searchQueries) {
-  const res = fuse.search(query);
-  allResults = allResults.concat(res);
-}
-
-// Permütasyon işlemi: filteredTokens üzerinde, 2-4 kelime arası ise permütasyonları oluştur ve arama yap
-if (filteredTokens.length > 1 && filteredTokens.length <= 3) {
-  function getPermutations(arr) {
-    if (arr.length <= 1) return [arr];
-    const perms = [];
-    for (let i = 0; i < arr.length; i++) {
-      const rest = arr.slice(0, i).concat(arr.slice(i + 1));
-      for (const perm of getPermutations(rest)) {
-        perms.push([arr[i], ...perm]);
-      }
-    }
-    return perms;
-  }
-  const perms = getPermutations(filteredTokens).map(p => p.join(" "));
-  const permQuerySet = new Set(perms);
-  for (const query of permQuerySet) {
+  // Perform fuzzy search for each query, collect all results
+  let allResults = [];
+  for (const query of searchQueries) {
     const res = fuse.search(query);
     allResults = allResults.concat(res);
   }
-}
 
-// Sort all results by score ascending, remove duplicates by item name
-const seen = new Set();
-const uniqueSortedResults = allResults
-  .sort((a, b) => a.score - b.score)
-  .filter((r) => {
-    if (seen.has(r.item.name)) return false;
-    seen.add(r.item.name);
-    return true;
-  });
+  // Permütasyon işlemi: filteredTokens üzerinde, 2-4 kelime arası ise permütasyonları oluştur ve arama yap
+  if (filteredTokens.length > 1 && filteredTokens.length <= 3) {
+    function getPermutations(arr) {
+      if (arr.length <= 1) return [arr];
+      const perms = [];
+      for (let i = 0; i < arr.length; i++) {
+        const rest = arr.slice(0, i).concat(arr.slice(i + 1));
+        for (const perm of getPermutations(rest)) {
+          perms.push([arr[i], ...perm]);
+        }
+      }
+      return perms;
+    }
+    const perms = getPermutations(filteredTokens).map(p => p.join(" "));
+    const permQuerySet = new Set(perms);
+    for (const query of permQuerySet) {
+      const res = fuse.search(query);
+      allResults = allResults.concat(res);
+    }
+  }
 
-// In non-production, log the top 10 matches and their scores for debugging
-if (process.env.NODE_ENV !== "production" && uniqueSortedResults.length) {
-  console.log(
-    "Top matches:",
-    uniqueSortedResults
-      .slice(0, 10)
-      .map((r) => `${r.item.name} (score: ${r.score})`)
-      .join(", ")
-  );
-}
+  // Sort all results by score ascending, remove duplicates by item name
+  const seen = new Set();
+  const uniqueSortedResults = allResults
+    .sort((a, b) => a.score - b.score)
+    .filter((r) => {
+      if (seen.has(r.item.name)) return false;
+      seen.add(r.item.name);
+      return true;
+    });
+
+  // In non-production, log the top 10 matches and their scores for debugging
+  if (process.env.NODE_ENV !== "production" && uniqueSortedResults.length) {
+    console.log(
+      "Top matches:",
+      uniqueSortedResults
+        .slice(0, 10)
+        .map((r) => `${r.item.name} (score: ${r.score})`)
+        .join(", ")
+    );
+  }
 
   return uniqueSortedResults.slice(0, limit).map((r) => r.item);
 }
