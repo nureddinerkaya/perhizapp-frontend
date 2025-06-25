@@ -57,6 +57,11 @@ export default function WordEditorPage() {
     return () => debouncedAnalyze.current && debouncedAnalyze.current.cancel();
   }, [foodList]);
 
+  // Yuvarlama yardımcı fonksiyonu
+  function roundNumber(val) {
+    return Math.round(val);
+  }
+
   function analyzeLine(line, lineIndex) {
     const matches = fuzzyFind(foodList, line);
     let lineResult = null;
@@ -71,7 +76,7 @@ export default function WordEditorPage() {
         carb: (item.carb * amt) / 100,
         fiber: (item.fiber * amt) / 100,
       };
-      display = `${formatNumber(amt)} g, ${formatNumber(lineResult.kcal)} kcal, ${formatNumber(lineResult.protein)} g protein, ${formatNumber(lineResult.carb)} g karbonhidrat, ${formatNumber(lineResult.fiber)} g lif`;
+      display = `${roundNumber(amt)} g, ${roundNumber(lineResult.kcal)} kcal, ${roundNumber(lineResult.protein)} g protein, ${roundNumber(lineResult.carb)} g karbonhidrat, ${roundNumber(lineResult.fiber)} g lif`;
     }
 
     setResults((prevResults) => {
@@ -363,7 +368,11 @@ export default function WordEditorPage() {
 
   // Sonuç satırında kcal ifadesini sadece bold ve siyah yapan yardımcı fonksiyon
   function highlightCalories(line) {
-    return line.replace(/(\d+(?:\.?\d*)?\s*kcal)/gi, '<span style="color:#000;font-weight:bold;">$1</span>');
+    // Make both 'kalori' and 'kcal' bold, and also numbers before kcal bold
+    return line
+      .replace(/(\d+(?:\.?\d*)?\s*kcal)/gi, '<span style="font-weight:bold; color:#000;">$1</span>')
+      .replace(/(\d+(?:\.?\d*)?\s*kalori)/gi, '<span style="font-weight:bold; color:#000;">$1</span>')
+      .replace(/(kcal|kalori)/gi, '<span style="font-weight:bold; color:#000;">$1</span>');
   }
 
   // Helper: get caret position (line, column)
@@ -483,9 +492,11 @@ export default function WordEditorPage() {
           />
           </div>
           <div className="flex w-full mt-8 text-xl">
-            <div className="w-1/3">Toplam:</div>
-            <div className="w-2/3">
-              {`${formatNumber(totals.gram)} g, ${formatNumber(totals.kcal)} kcal, ${formatNumber(totals.protein)} g protein, ${formatNumber(totals.carb)} g karbonhidrat, ${formatNumber(totals.fiber)} g lif`}
+            <div className="w-1/3" style={{ paddingLeft: '0.5em' }}>Toplam:</div>
+            <div className="w-2/3" style={{ paddingLeft: '1.0em' }}>
+              {`${roundNumber(totals.gram)} g, `}
+              <span style={{ fontWeight: 'bold' }}>{`${roundNumber(totals.kcal)} kcal`}</span>
+              {`, ${roundNumber(totals.protein)} g protein, ${roundNumber(totals.carb)} g karbonhidrat, ${roundNumber(totals.fiber)} g lif`}
             </div>
           </div>
         </div>
