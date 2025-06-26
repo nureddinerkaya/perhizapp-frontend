@@ -10,6 +10,8 @@ export default function WordEditorPage() {
   const params = useParams();
   const foodList = useFoodList();
   const [text, setText] = useState("");
+  const [authUser, setAuthUser] = useState("");
+  const [password, setPassword] = useState("");
   const [results, setResults] = useState([]); // Artık dizi
   const [lineValues, setLineValues] = useState([]); // per line numeric results
   const [totals, setTotals] = useState({
@@ -24,6 +26,27 @@ export default function WordEditorPage() {
   const debouncedAnalyze = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setAuthUser(localStorage.getItem("username") || "");
+      setPassword(localStorage.getItem("password") || "");
+    }
+  }, []);
+
+  useEffect(() => {
+    function handleStorage() {
+      setAuthUser(localStorage.getItem("username") || "");
+      setPassword(localStorage.getItem("password") || "");
+    }
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  function getAuthHeaders() {
+    if (!authUser || !password) return {};
+    return { Authorization: `Basic ${btoa(`${authUser}:${password}`)}` };
+  }
 
   function adjustTotals(delta) {
     setTotals((t) => ({
@@ -419,7 +442,9 @@ export default function WordEditorPage() {
     if (params?.username && params?.recordName) {
       setLoading(true);
       setError("");
-      fetch(`${baseUrl}/api/records/getRecord/${params.username}`)
+      fetch(`${baseUrl}/api/records/getRecord`, {
+        headers: getAuthHeaders(),
+      })
         .then(async (res) => {
           const text = await res.text();
           if (!text) {
@@ -454,7 +479,7 @@ export default function WordEditorPage() {
     } else {
       setLoading(false);
     }
-  }, [params?.username, params?.recordName]);
+  }, [params?.username, params?.recordName, authUser, password]);
 
   // Kayıt güncelleme fonksiyonu
   function saveRecord() {
@@ -467,7 +492,7 @@ export default function WordEditorPage() {
     };
     fetch(`${baseUrl}/api/records/putRecord`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(body),
     });
   }
@@ -476,7 +501,7 @@ export default function WordEditorPage() {
     return () => {
       saveRecord();
     };
-  }, [params?.username, params?.recordName, text]);
+  }, [params?.username, params?.recordName, text, authUser, password]);
 
   if (loading) {
     return (
