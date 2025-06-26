@@ -28,6 +28,17 @@ export default function WordEditorPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+    if (resultsRef.current) {
+      resultsRef.current.style.height = 'auto';
+      resultsRef.current.style.height = resultsRef.current.scrollHeight + 'px';
+    }
+  }, [text, results]);
+
+  useEffect(() => {
     if (typeof window !== "undefined") {
       setAuthUser(localStorage.getItem("username") || "");
       setPassword(localStorage.getItem("password") || "");
@@ -78,22 +89,6 @@ export default function WordEditorPage() {
     )} g protein, ${roundNumber(t.carb)} g karbonhidrat, ${roundNumber(
       t.fiber
     )} g lif`;
-  }
-
-  function parseTotalsString(str) {
-    const m =
-      str &&
-      str.match(
-        /(\d+)\s*g,\s*(\d+)\s*kcal,\s*(\d+)\s*g protein,\s*(\d+)\s*g karbonhidrat,\s*(\d+)\s*g lif/
-      );
-    if (!m) return { gram: 0, kcal: 0, protein: 0, carb: 0, fiber: 0 };
-    return {
-      gram: Number(m[1]),
-      kcal: Number(m[2]),
-      protein: Number(m[3]),
-      carb: Number(m[4]),
-      fiber: Number(m[5]),
-    };
   }
 
   // Suggestion dropdown state
@@ -515,24 +510,20 @@ export default function WordEditorPage() {
           setResults(dataLines);
           const lineVals = dataLines.map(parseResultLine);
           setLineValues(lineVals);
-          if (record.toplam) {
-            setTotals(parseTotalsString(record.toplam));
-          } else {
-            const t = lineVals.reduce(
-              (acc, v) => {
-                if (!v) return acc;
-                return {
-                  gram: acc.gram + v.gram,
-                  kcal: acc.kcal + v.kcal,
-                  protein: acc.protein + v.protein,
-                  carb: acc.carb + v.carb,
-                  fiber: acc.fiber + v.fiber,
-                };
-              },
-              { gram: 0, kcal: 0, protein: 0, carb: 0, fiber: 0 }
-            );
-            setTotals(t);
-          }
+          const t = lineVals.reduce(
+            (acc, v) => {
+              if (!v) return acc;
+              return {
+                gram: acc.gram + v.gram,
+                kcal: acc.kcal + v.kcal,
+                protein: acc.protein + v.protein,
+                carb: acc.carb + v.carb,
+                fiber: acc.fiber + v.fiber,
+              };
+            },
+            { gram: 0, kcal: 0, protein: 0, carb: 0, fiber: 0 }
+          );
+          setTotals(t);
         })
         .catch((err) => {
           setText("");
@@ -607,7 +598,7 @@ export default function WordEditorPage() {
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            style={{ resize: 'none' }}
+            style={{ resize: 'none', overflow: 'hidden' }}
             className="w-1/3 outline-none p-2 bg-white text-xl"
           />
           {/* Suggestion dropdown menu */}
@@ -652,7 +643,7 @@ export default function WordEditorPage() {
           <div
             ref={resultsRef}
             className="w-2/3 outline-none p-2 bg-white text-gray-700 text-xl whitespace-pre-line select-text"
-            style={{ minHeight: '100px' }}
+            style={{ minHeight: '100px', overflow: 'hidden' }}
             dangerouslySetInnerHTML={{
               __html: results.map(highlightCalories).join("\n")
             }}
