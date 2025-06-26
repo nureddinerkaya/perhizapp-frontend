@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import debounce from "lodash.debounce";
 import { extractAmount, fuzzyFind, detectUnit } from "@/app/analyzer";
 import { useParams } from "next/navigation";
+import { getBasicAuthHeader } from "@/app/utils";
 
 export default function WordEditorPage() {
   const [foodList, setFoodList] = useState([]);
@@ -28,7 +29,9 @@ export default function WordEditorPage() {
     if (params?.username && params?.recordName) {
       setLoading(true);
       setError("");
-      fetch(`${baseUrl}/api/records/getRecord/${params.username}`)
+      fetch(`${baseUrl}/api/records/getRecord/${params.username}`, {
+        headers: getBasicAuthHeader(),
+      })
         .then(async (res) => {
           const text = await res.text();
           if (!text) throw new Error("Kayıt bulunamadı veya boş yanıt.");

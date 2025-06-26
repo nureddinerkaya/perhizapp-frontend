@@ -6,6 +6,7 @@ import Button from "@mui/material/Button";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import Stack from "@mui/material/Stack";
+import { getBasicAuthHeader } from "./utils";
 
 function slugify(text) {
   const map = {
@@ -38,7 +39,9 @@ export default function Home() {
 
   function fetchHistory() {
     if (!username) return;
-    fetch(`${baseUrl}/api/records/getRecord/${encodeURIComponent(username)}`)
+    fetch(`${baseUrl}/api/records/getRecord/${encodeURIComponent(username)}`, {
+      headers: getBasicAuthHeader(),
+    })
       .then((res) => res.json())
       .then((data) => {
         const recs = Array.isArray(data) ? data : [];
@@ -63,7 +66,10 @@ export default function Home() {
     const slug = slugify(recordName);
     fetch(`${baseUrl}/api/records/postRecord`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...getBasicAuthHeader(),
+      },
       body: JSON.stringify({
         username,
         name: slug,

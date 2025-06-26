@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import debounce from "lodash.debounce";
 import useFoodList from "@/app/useFoodList";
-import { formatNumber } from "@/app/utils";
+import { formatNumber, getBasicAuthHeader } from "@/app/utils";
 import { extractAmount, fuzzyFind, detectUnit } from "@/app/analyzer";
 import { useParams } from "next/navigation";
 
@@ -419,7 +419,9 @@ export default function WordEditorPage() {
     if (params?.username && params?.recordName) {
       setLoading(true);
       setError("");
-      fetch(`${baseUrl}/api/records/getRecord/${params.username}`)
+      fetch(`${baseUrl}/api/records/getRecord/${params.username}`, {
+        headers: getBasicAuthHeader(),
+      })
         .then(async (res) => {
           const text = await res.text();
           if (!text) {
@@ -467,7 +469,10 @@ export default function WordEditorPage() {
     };
     fetch(`${baseUrl}/api/records/putRecord`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...getBasicAuthHeader(),
+      },
       body: JSON.stringify(body),
     });
   }
