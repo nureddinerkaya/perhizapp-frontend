@@ -111,64 +111,83 @@ export default function Home() {
 
   // Eğer kullanıcı yoksa kayıt ekleme ve kayıtlar gösterilmesin
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-100 to-blue-300 px-2 py-8">
-      <Paper elevation={8} className="w-full max-w-3xl p-10 flex flex-col items-center gap-8" style={{borderRadius: 24}}>
-        <Typography variant="h2" className="mb-2 font-bold text-blue-700" align="center" style={{letterSpacing: 1}}>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-100 px-2 py-8">
+      <Paper
+        elevation={8}
+        className="relative w-full max-w-4xl p-12 flex flex-col items-center gap-8"
+        style={{ borderRadius: 24 }}
+      >
+        <Typography variant="h3" className="font-bold text-blue-700" align="center">
           PerhizApp
         </Typography>
-        {username ? (
-          <>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" className="w-full mb-4">
-              <Typography variant="h6">Hoş geldin, {username}!</Typography>
-              <Button onClick={handleLogout} variant="outlined" color="error">
+          {username ? (
+            <>
+              <Typography variant="h5" className="font-medium" align="center">
+                Hoş geldin, {username}!
+              </Typography>
+              <Typography color="text.secondary" align="center" style={{ fontSize: 18 }}>
+                Kişisel diyet kayıtlarınızı tutabileceğiniz bir uygulama.
+              </Typography>
+              <Button onClick={createRecord} variant="contained" color="success" className="mb-4" size="large" style={{ minWidth: 220, fontSize: 18 }}>
+                Yeni Perhiz Kaydı
+              </Button>
+              <Typography variant="h5" className="mt-2 mb-4 font-semibold" align="center">
+                Perhiz Kayıtları
+              </Typography>
+              {records.length === 0 ? (
+                <Typography align="center" color="text.secondary">
+                  Henüz kayıt yok
+                </Typography>
+              ) : (
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={3} className="w-full" flexWrap="wrap" justifyContent="center">
+                  {records.map((r) => (
+                    <Link
+                      key={r.recordName || r.name}
+                      href={`/${username}/${encodeURIComponent(r.recordName || r.name)}`}
+                      style={{ textDecoration: "none", flex: 1, minWidth: 180, maxWidth: 260 }}
+                    >
+                      <Paper elevation={2} className="p-6 hover:bg-blue-50 cursor-pointer text-center" style={{ borderRadius: 16 }}>
+                        <Typography variant="subtitle1" style={{ fontSize: 18 }}>
+                          {r.recordName || r.name}
+                        </Typography>
+                      </Paper>
+                    </Link>
+                  ))}
+                </Stack>
+              )}
+            </>
+          ) : (
+            <>
+              <Typography variant="h4" className="mb-4 font-bold text-blue-700" align="center">
+                PerhizApp'e Hoş Geldiniz
+              </Typography>
+              <Typography className="mb-8 text-center" color="text.secondary" style={{ fontSize: 18 }}>
+                Kişisel diyet kayıtlarınızı tutabileceğiniz bir uygulama.
+              </Typography>
+              <Stack direction="row" spacing={3} justifyContent="center" className="mb-8">
+                <Button component={Link} href="/login" variant="contained" color="primary" size="large" style={{ minWidth: 160, fontSize: 18 }}>
+                  Login
+                </Button>
+                <Button component={Link} href="/signup" variant="outlined" color="secondary" size="large" style={{ minWidth: 160, fontSize: 18 }}>
+                  Sign Up
+                </Button>
+              </Stack>
+            </>
+          )}
+          {username && (
+            <div className="absolute right-8 bottom-8">
+              <Button
+                onClick={handleLogout}
+                variant="contained"
+                color="error"
+                size="large"
+                style={{ backgroundColor: "#fff", color: "#d32f2f" }}
+              >
                 Çıkış Yap
               </Button>
-            </Stack>
-            <Typography className="mb-8 text-center" color="text.secondary" style={{fontSize: 18}}>
-              Kişisel diyet kayıtlarınızı tutabileceğiniz bir uygulama.
-            </Typography>
-            <Button onClick={createRecord} variant="contained" color="success" className="mb-8" size="large" style={{minWidth: 220, fontSize: 18}}>
-              Yeni Perhiz Kaydı
-            </Button>
-            <Typography variant="h5" className="mb-4 text-center font-semibold">
-              Perhiz Kayıtları
-            </Typography>
-            {records.length === 0 ? (
-              <Typography align="center" color="text.secondary">Henüz kayıt yok</Typography>
-            ) : (
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={3} className="w-full" flexWrap="wrap" justifyContent="center">
-                {records.map((r) => (
-                  <Link
-                    key={r.recordName || r.name}
-                    href={`/${username}/${encodeURIComponent(r.recordName || r.name)}`}
-                    style={{ textDecoration: "none", flex: 1, minWidth: 180, maxWidth: 260 }}
-                  >
-                    <Paper elevation={2} className="p-6 hover:bg-blue-50 cursor-pointer text-center" style={{borderRadius: 16}}>
-                      <Typography variant="subtitle1" style={{fontSize: 18}}>
-                        {(r.recordName || r.name).replace(/-/g, " ")}
-                      </Typography>
-                    </Paper>
-                  </Link>
-                ))}
-              </Stack>
-            )}
-          </>
-        ) : (
-          <>
-            <Typography className="mb-8 text-center" color="text.secondary" style={{fontSize: 18}}>
-              Kişisel diyet kayıtlarınızı tutabileceğiniz bir uygulama.
-            </Typography>
-            <Stack direction="row" spacing={3} justifyContent="center" className="mb-8">
-              <Button component={Link} href="/login" variant="contained" color="primary" size="large" style={{minWidth: 160, fontSize: 18}}>
-                Login
-              </Button>
-              <Button component={Link} href="/signup" variant="outlined" color="secondary" size="large" style={{minWidth: 160, fontSize: 18}}>
-                Sign Up
-              </Button>
-            </Stack>
-          </>
-        )}
-      </Paper>
-    </div>
+            </div>
+          )}
+        </Paper>
+      </div>
   );
 }
