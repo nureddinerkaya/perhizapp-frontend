@@ -39,6 +39,7 @@ export default function SignUpPage() {
         if (message === "User already exists") message = "Bu kullanıcı adı zaten kayıtlı.";
         if (!res.ok) throw new Error(message || "Kaydolma başarısız");
         localStorage.setItem("username", username);
+        localStorage.setItem("password", password);
         setMessage(message || "Kaydolma başarılı");
         router.push("/");
       })

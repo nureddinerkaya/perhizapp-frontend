@@ -33,12 +33,20 @@ function slugify(text) {
 export default function Home() {
   const [records, setRecords] = useState([]);
   const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const router = useRouter();
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
+  function getAuthHeaders() {
+    if (!username || !password) return {};
+    return { Authorization: `Basic ${btoa(`${username}:${password}`)}` };
+  }
+
   function fetchHistory() {
-    if (!username) return;
-    fetch(`${baseUrl}/api/records/getRecord/${encodeURIComponent(username)}`)
+    if (!username || !password) return;
+    fetch(`${baseUrl}/api/records/getRecord/${encodeURIComponent(username)}`, {
+      headers: getAuthHeaders(),
+    })
       .then((res) => res.json())
       .then((data) => {
         const recs = Array.isArray(data) ? data : [];
@@ -50,20 +58,22 @@ export default function Home() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       setUsername(localStorage.getItem("username") || "");
+      setPassword(localStorage.getItem("password") || "");
     }
   }, []);
 
   useEffect(() => {
     fetchHistory();
-  }, [baseUrl, username]);
+  }, [baseUrl, username, password]);
 
   function createRecord() {
     const recordName = prompt("Perhiz kaydının ismi");
     if (!recordName) return;
     const slug = slugify(recordName);
+    if (!password) return;
     fetch(`${baseUrl}/api/records/postRecord`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify({
         username,
         name: slug,
@@ -84,6 +94,7 @@ export default function Home() {
   useEffect(() => {
     function handleStorage() {
       setUsername(localStorage.getItem("username") || "");
+      setPassword(localStorage.getItem("password") || "");
     }
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
@@ -92,7 +103,9 @@ export default function Home() {
   // Çıkış fonksiyonu
   function handleLogout() {
     localStorage.removeItem("username");
+    localStorage.removeItem("password");
     setUsername("");
+    setPassword("");
     window.location.reload();
   }
 
