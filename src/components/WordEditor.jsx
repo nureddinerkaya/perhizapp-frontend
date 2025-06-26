@@ -3,14 +3,40 @@ import { useState, useRef, useEffect } from "react";
 import debounce from "lodash.debounce";
 import { extractAmount, fuzzyFind, detectUnit } from "@/app/[username]/[recordName]/analyzer";
 
-export default function WordEditor() {
+// Component for editing diet records. It now accepts initial values so that
+// existing records can be displayed when the page first renders without
+// triggering a fresh analyse pass.
+//
+// Props:
+//   initialText:    string with the foods text
+//   initialResults: string with the analysed lines
+//   initialTotal:   string with the total summary
+//   onChange:       callback({foods, data, total}) when any field changes
+
+export default function WordEditor({
+  initialText = "",
+  initialResults = "",
+  initialTotal = "",
+  onChange,
+}) {
   const [foodList, setFoodList] = useState([]);
-  const [text, setText] = useState("");
-  const [results, setResults] = useState([]); // Artık dizi
+  const [text, setText] = useState(initialText);
+  const [results, setResults] = useState(
+    initialResults ? initialResults.split("\n") : []
+  );
+  const [total, setTotal] = useState(initialTotal);
   const [panelTop, setPanelTop] = useState(0);
   const textareaRef = useRef(null);
   const resultsRef = useRef(null);
   const debouncedAnalyze = useRef(null);
+
+  // Sync state with incoming props if they change
+  useEffect(() => setText(initialText), [initialText]);
+  useEffect(
+    () => setResults(initialResults ? initialResults.split("\n") : []),
+    [initialResults]
+  );
+  useEffect(() => setTotal(initialTotal), [initialTotal]);
 
   useEffect(() => {
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -151,6 +177,11 @@ export default function WordEditor() {
     return line.replace(/(\d+(?:\.?\d*)?\s*kcal)/gi, '<span style="color:#000;font-weight:bold;">$1</span>');
   }
 
+  // Notify parent component whenever values change
+  useEffect(() => {
+    if (onChange) onChange({ foods: text, data: results.join("\n"), total });
+  }, [text, results, total, onChange]);
+
   return (
     <div className="flex justify-center items-start bg-gray-100 min-h-screen px-8"
       onMouseUp={e => {
@@ -189,6 +220,15 @@ export default function WordEditor() {
                 if (textareaRef.current) textareaRef.current.focus();
               }
             }}
+          />
+        </div>
+        <div className="w-full mt-4 flex flex-col gap-2">
+          <label className="font-semibold">Toplam</label>
+          <input
+            type="text"
+            className="p-2 border rounded"
+            value={total}
+            onChange={(e) => setTotal(e.target.value)}
           />
         </div>
       </div>
