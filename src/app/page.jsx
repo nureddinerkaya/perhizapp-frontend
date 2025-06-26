@@ -98,23 +98,15 @@ export default function Home() {
 
   // Eğer kullanıcı yoksa kayıt ekleme ve kayıtlar gösterilmesin
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-50 to-blue-100">
-      <header className="w-full max-w-6xl mx-auto flex items-center justify-between py-6 px-4">
-        <Typography variant="h3" className="font-bold text-blue-700">PerhizApp</Typography>
-        {username && (
-          <Button
-            onClick={handleLogout}
-            variant="contained"
-            color="error"
-            size="large"
-            style={{ backgroundColor: "#fff", color: "#d32f2f" }}
-          >
-            Çıkış Yap
-          </Button>
-        )}
-      </header>
-      <main className="flex-grow flex items-center justify-center px-4 pb-10">
-        <Paper elevation={6} className="w-full max-w-3xl p-10 flex flex-col items-center gap-8" style={{ borderRadius: 24 }}>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-100 px-2 py-8">
+      <Paper
+        elevation={8}
+        className="relative w-full max-w-4xl p-12 flex flex-col items-center gap-8"
+        style={{ borderRadius: 24 }}
+      >
+        <Typography variant="h3" className="font-bold text-blue-700" align="center">
+          PerhizApp
+        </Typography>
           {username ? (
             <>
               <Typography variant="h5" className="font-medium" align="center">
@@ -169,8 +161,20 @@ export default function Home() {
               </Stack>
             </>
           )}
+          {username && (
+            <div className="absolute right-8 bottom-8">
+              <Button
+                onClick={handleLogout}
+                variant="contained"
+                color="error"
+                size="large"
+                style={{ backgroundColor: "#fff", color: "#d32f2f" }}
+              >
+                Çıkış Yap
+              </Button>
+            </div>
+          )}
         </Paper>
-      </main>
-    </div>
+      </div>
   );
 }
