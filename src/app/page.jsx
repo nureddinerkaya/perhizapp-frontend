@@ -13,7 +13,7 @@ export default function Home() {
 
   function fetchHistory() {
     if (!username) return;
-    fetch(`${baseUrl}/api/records/getRecord?username=${username}`)
+    fetch(`${baseUrl}/api/records/getRecord/${encodeURIComponent(username)}`)
       .then((res) => res.json())
       .then((data) => {
         const recs = Array.isArray(data) ? data : [];
@@ -40,11 +40,12 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         username,
-        recordName,
+        name: recordName,
         foods: "",
         data: "",
-        total: "",
+        toplam: "",
       }),
+      // credentials: "include", // Cookie göndermek isterseniz açabilirsiniz
     })
       .then(() => fetchHistory())
       .catch(() => {});

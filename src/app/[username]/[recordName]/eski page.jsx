@@ -2,41 +2,19 @@
 import { useState, useRef, useEffect } from "react";
 import debounce from "lodash.debounce";
 import { extractAmount, fuzzyFind, detectUnit } from "@/app/analyzer";
+import { useParams } from "next/navigation";
 
-// Component for editing diet records. It now accepts initial values so that
-// existing records can be displayed when the page first renders without
-// triggering a fresh analyse pass.
-//
-// Props:
-//   initialText:    string with the foods text
-//   initialResults: string with the analysed lines
-//   initialTotal:   string with the total summary
-//   onChange:       callback({foods, data, total}) when any field changes
-
-export default function WordEditor({
-  initialText = "",
-  initialResults = "",
-  initialTotal = "",
-  onChange,
-}) {
+export default function WordEditorPage() {
   const [foodList, setFoodList] = useState([]);
-  const [text, setText] = useState(initialText);
-  const [results, setResults] = useState(
-    initialResults ? initialResults.split("\n") : []
-  );
-  const [total, setTotal] = useState(initialTotal);
+  const [text, setText] = useState("");
+  const [results, setResults] = useState([]);
   const [panelTop, setPanelTop] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const textareaRef = useRef(null);
   const resultsRef = useRef(null);
   const debouncedAnalyze = useRef(null);
-
-  // Sync state with incoming props if they change
-  useEffect(() => setText(initialText), [initialText]);
-  useEffect(
-    () => setResults(initialResults ? initialResults.split("\n") : []),
-    [initialResults]
-  );
-  useEffect(() => setTotal(initialTotal), [initialTotal]);
+  const params = useParams();
 
   useEffect(() => {
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -44,6 +22,44 @@ export default function WordEditor({
       .then((res) => res.json())
       .then((data) => setFoodList(data));
   }, []);
+
+  useEffect(() => {
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+    if (params?.username && params?.recordName) {
+      setLoading(true);
+      setError("");
+      fetch(`${baseUrl}/api/records/getRecord/${params.username}`)
+        .then(async (res) => {
+          const text = await res.text();
+          if (!text) throw new Error("Kayıt bulunamadı veya boş yanıt.");
+          let arr;
+          try {
+            arr = JSON.parse(text);
+          } catch (e) {
+            throw new Error("Geçersiz JSON formatı.");
+          }
+          // Dizi içinden username ve name eşleşen kaydı bul
+          const record = Array.isArray(arr)
+            ? arr.find(
+                (item) =>
+                  item.username === params.username &&
+                  item.name === params.recordName
+              )
+            : null;
+          if (!record) throw new Error("Kayıt bulunamadı.");
+          setText(record.foods || record.data || "");
+          setResults([]); // results alanı yok, boş başlat
+        })
+        .catch((err) => {
+          setText("");
+          setResults([]);
+          setError(err.message || "Kayıt yüklenemedi.");
+        })
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, [params?.username, params?.recordName]);
 
   useEffect(() => {
     debouncedAnalyze.current = debounce((line, lineIndex) => {
@@ -93,7 +109,6 @@ export default function WordEditor({
     const lineIndex = before.split("\n").length - 1;
     const lines = value.split("\n");
     const currLine = lines[lineIndex] || "";
-    // Sonuç dizisini satır sayısına göre senkronize et
     setResults((prevResults) => {
       const arr = prevResults.slice();
       arr.length = lines.length;
@@ -147,19 +162,15 @@ export default function WordEditor({
         }
         lines[lineIndex] = phrase;
       }
-      // Alt satıra geçmek için ilgili yere boş satır ekle
       lines.splice(lineIndex + 1, 0, "");
       const newText = lines.join("\n");
       setText(newText);
-      // Sadece güncellenen satırları analiz et
       analyzeLine(lines[lineIndex], lineIndex);
       analyzeLine("", lineIndex + 1);
       requestAnimationFrame(() => {
-        // İmleci yeni satıra konumlandır
         const pos = lines.slice(0, lineIndex + 2).join("\n").length + 1;
         textarea.selectionStart = textarea.selectionEnd = pos;
         setPanelTop((lineIndex + 2) * lineHeight - textarea.scrollTop);
-        // textarea yüksekliğini ayarla
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto';
           textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
@@ -172,20 +183,28 @@ export default function WordEditor({
     }
   }
 
-  // Sonuç satırında kcal ifadesini sadece bold ve siyah yapan yardımcı fonksiyon
   function highlightCalories(line) {
     return line.replace(/(\d+(?:\.?\d*)?\s*kcal)/gi, '<span style="color:#000;font-weight:bold;">$1</span>');
   }
 
-  // Notify parent component whenever values change
-  useEffect(() => {
-    if (onChange) onChange({ foods: text, data: results.join("\n"), total });
-  }, [text, results, total, onChange]);
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gray-100">
+        <div className="text-xl text-gray-600">Yükleniyor...</div>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gray-100">
+        <div className="text-xl text-red-600">{error}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex justify-center items-start bg-gray-100 min-h-screen px-8"
       onMouseUp={e => {
-        // Sadece textarea veya sonuçlar divi dışında bir yere tıklanırsa textarea'ya odaklan
         if (
           textareaRef.current &&
           e.target !== textareaRef.current &&
@@ -215,20 +234,10 @@ export default function WordEditor({
               __html: results.map(highlightCalories).join("\n")
             }}
             onMouseUp={e => {
-              // Sadece tıklama ise textarea'ya odaklan, ama metin seçiliyorsa odaklanma
               if (window.getSelection && window.getSelection().toString().length === 0) {
                 if (textareaRef.current) textareaRef.current.focus();
               }
             }}
-          />
-        </div>
-        <div className="w-full mt-4 flex flex-col gap-2">
-          <label className="font-semibold">Toplam</label>
-          <input
-            type="text"
-            className="p-2 border rounded"
-            value={total}
-            onChange={(e) => setTotal(e.target.value)}
           />
         </div>
       </div>
