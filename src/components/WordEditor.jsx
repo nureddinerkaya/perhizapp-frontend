@@ -30,6 +30,17 @@ export default function WordEditor({
   const resultsRef = useRef(null);
   const debouncedAnalyze = useRef(null);
 
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+    if (resultsRef.current) {
+      resultsRef.current.style.height = 'auto';
+      resultsRef.current.style.height = resultsRef.current.scrollHeight + 'px';
+    }
+  }, [text, results]);
+
   // Sync state with incoming props if they change
   useEffect(() => setText(initialText), [initialText]);
   useEffect(
@@ -204,13 +215,13 @@ export default function WordEditor({
             value={text}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            style={{ resize: 'none' }}
+            style={{ resize: 'none', overflow: 'hidden' }}
             className="w-1/3 outline-none p-2 bg-white text-xl"
           />
           <div
             ref={resultsRef}
             className="w-2/3 outline-none p-2 bg-white text-gray-700 text-xl whitespace-pre-line select-text"
-            style={{ minHeight: '100px' }}
+            style={{ minHeight: '100px', overflow: 'hidden' }}
             dangerouslySetInnerHTML={{
               __html: results.map(highlightCalories).join("\n")
             }}

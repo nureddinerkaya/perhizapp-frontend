@@ -175,13 +175,13 @@ export default function Home() {
             </>
           )}
           {username && (
-            <div className="absolute right-8 bottom-8">
+            <div className="absolute right-8 top-8">
               <Button
                 onClick={handleLogout}
                 variant="contained"
                 color="error"
                 size="large"
-                style={{ backgroundColor: "#fff", color: "#d32f2f" }}
+                style={{ backgroundColor: "#d3d3d3", color: "#d32f2f" }}
               >
                 Çıkış Yap
               </Button>

@@ -17,6 +17,17 @@ export default function WordEditorPage() {
   const params = useParams();
 
   useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+    if (resultsRef.current) {
+      resultsRef.current.style.height = 'auto';
+      resultsRef.current.style.height = resultsRef.current.scrollHeight + 'px';
+    }
+  }, [text, results]);
+
+  useEffect(() => {
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
     fetch(`${baseUrl}/api/food/getAll`)
       .then((res) => res.json())
@@ -223,13 +234,13 @@ export default function WordEditorPage() {
             value={text}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            style={{ resize: 'none' }}
+            style={{ resize: 'none', overflow: 'hidden' }}
             className="w-1/3 outline-none p-2 bg-white text-xl"
           />
           <div
             ref={resultsRef}
             className="w-2/3 outline-none p-2 bg-white text-gray-700 text-xl whitespace-pre-line select-text"
-            style={{ minHeight: '100px' }}
+            style={{ minHeight: '100px', overflow: 'hidden' }}
             dangerouslySetInnerHTML={{
               __html: results.map(highlightCalories).join("\n")
             }}

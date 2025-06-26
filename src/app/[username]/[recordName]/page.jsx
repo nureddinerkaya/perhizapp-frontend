@@ -28,6 +28,17 @@ export default function WordEditorPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+    if (resultsRef.current) {
+      resultsRef.current.style.height = 'auto';
+      resultsRef.current.style.height = resultsRef.current.scrollHeight + 'px';
+    }
+  }, [text, results]);
+
+  useEffect(() => {
     if (typeof window !== "undefined") {
       setAuthUser(localStorage.getItem("username") || "");
       setPassword(localStorage.getItem("password") || "");
@@ -56,6 +67,28 @@ export default function WordEditorPage() {
       carb: t.carb + (delta.carb || 0),
       fiber: t.fiber + (delta.fiber || 0),
     }));
+  }
+
+  function parseResultLine(line) {
+    const m = line.match(
+      /(\d+)\s*g,\s*(\d+)\s*kcal,\s*(\d+)\s*g protein,\s*(\d+)\s*g karbonhidrat,\s*(\d+)\s*g lif/
+    );
+    if (!m) return null;
+    return {
+      gram: Number(m[1]),
+      kcal: Number(m[2]),
+      protein: Number(m[3]),
+      carb: Number(m[4]),
+      fiber: Number(m[5]),
+    };
+  }
+
+  function totalsToString(t) {
+    return `${roundNumber(t.gram)} g, ${roundNumber(t.kcal)} kcal, ${roundNumber(
+      t.protein
+    )} g protein, ${roundNumber(t.carb)} g karbonhidrat, ${roundNumber(
+      t.fiber
+    )} g lif`;
   }
 
   // Suggestion dropdown state
@@ -467,9 +500,30 @@ export default function WordEditorPage() {
             : null;
           if (!record) {
             setText("");
+            setResults([]);
+            setLineValues([]);
+            setTotals({ gram: 0, kcal: 0, protein: 0, carb: 0, fiber: 0 });
             return;
           }
-          setText(record.foods || record.data || "");
+          setText(record.foods || "");
+          const dataLines = (record.data || "").split("\n");
+          setResults(dataLines);
+          const lineVals = dataLines.map(parseResultLine);
+          setLineValues(lineVals);
+          const t = lineVals.reduce(
+            (acc, v) => {
+              if (!v) return acc;
+              return {
+                gram: acc.gram + v.gram,
+                kcal: acc.kcal + v.kcal,
+                protein: acc.protein + v.protein,
+                carb: acc.carb + v.carb,
+                fiber: acc.fiber + v.fiber,
+              };
+            },
+            { gram: 0, kcal: 0, protein: 0, carb: 0, fiber: 0 }
+          );
+          setTotals(t);
         })
         .catch((err) => {
           setText("");
@@ -489,6 +543,8 @@ export default function WordEditorPage() {
       username: params.username,
       name: params.recordName,
       foods: text,
+      data: results.join("\n"),
+      toplam: totalsToString(totals),
     };
     fetch(`${baseUrl}/api/records/putRecord`, {
       method: "PUT",
@@ -542,7 +598,7 @@ export default function WordEditorPage() {
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            style={{ resize: 'none' }}
+            style={{ resize: 'none', overflow: 'hidden' }}
             className="w-1/3 outline-none p-2 bg-white text-xl"
           />
           {/* Suggestion dropdown menu */}
@@ -587,7 +643,7 @@ export default function WordEditorPage() {
           <div
             ref={resultsRef}
             className="w-2/3 outline-none p-2 bg-white text-gray-700 text-xl whitespace-pre-line select-text"
-            style={{ minHeight: '100px' }}
+            style={{ minHeight: '100px', overflow: 'hidden' }}
             dangerouslySetInnerHTML={{
               __html: results.map(highlightCalories).join("\n")
             }}
