@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import debounce from "lodash.debounce";
-import { extractAmount, fuzzyFind, detectUnit } from "@/app/home/analyzer";
+import { extractAmount, fuzzyFind, detectUnit } from "@/app/[username]/[recordName]/analyzer";
 
 export default function WordEditor() {
   const [foodList, setFoodList] = useState([]);
