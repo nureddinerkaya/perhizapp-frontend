@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fuzzyFind, extractAmount } from '../src/app/[username]/[recordName]/analyzer.js';
+import { fuzzyFind, extractAmount } from '../src/app/analyzer.js';
 
 const foodList = [
   { name: 'Tavuk Göğsü' },

@@ -11,29 +11,12 @@ export default function Home() {
   const [username, setUsername] = useState("");
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
-  function getAuthHeader() {
-    const username = localStorage.getItem("username") || "";
-    const password = localStorage.getItem("password") || "";
-    if (!username || !password) return {};
-    const encoded = btoa(`${username}:${password}`);
-    return { Authorization: `Basic ${encoded}` };
-  }
-
   function fetchHistory() {
-    fetch(`${baseUrl}/api/users/getHistory`, {
-      headers: {
-        ...getAuthHeader(),
-      },
-    })
-      .then((res) => res.text())
-      .then((text) => {
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch {
-          data = {};
-        }
-        const recs = Array.isArray(data.records) ? data.records : [];
+    if (!username) return;
+    fetch(`${baseUrl}/api/records/getRecord/${encodeURIComponent(username)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        const recs = Array.isArray(data) ? data : [];
         setRecords(recs);
       })
       .catch(() => {});
@@ -52,23 +35,17 @@ export default function Home() {
   function createRecord() {
     const recordName = prompt("Perhiz kaydının ismi");
     if (!recordName) return;
-    const payload = {
-      records: [
-        {
-          recordName,
-          entries: [
-            // Yeni kayıt oluşturulurken entries boş başlatılır
-          ],
-        },
-      ],
-    };
-    fetch(`${baseUrl}/api/users/putHistory`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        ...getAuthHeader(),
-      },
-      body: JSON.stringify(payload),
+    fetch(`${baseUrl}/api/records/postRecord`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username,
+        name: recordName,
+        foods: "",
+        data: "",
+        toplam: "",
+      }),
+      // credentials: "include", // Cookie göndermek isterseniz açabilirsiniz
     })
       .then(() => fetchHistory())
       .catch(() => {});
