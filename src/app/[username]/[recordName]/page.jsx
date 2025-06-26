@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import debounce from "lodash.debounce";
 import useFoodList from "@/app/useFoodList";
 import { formatNumber } from "@/app/utils";
-import { extractAmount, fuzzyFind, detectUnit } from "@/app/analyzer";
+import { extractAmount, fuzzyFind, detectUnit, normalizeInput } from "@/app/analyzer";
 import { useParams } from "next/navigation";
 
 export default function WordEditorPage() {
@@ -435,6 +435,44 @@ export default function WordEditorPage() {
       .replace(/(kcal|kalori)/gi, '<span style="font-weight:bold; color:#000;">$1</span>');
   }
 
+  // Yemek öğesi başlıkları (sabah, öğle, akşam) için aradaki değerlerin toplamını hesapla
+  useEffect(() => {
+    const lines = text.split("\n");
+    const mealKeywords = ["sabah", "ogle", "aksam"];
+    let newResults = results.slice();
+    let currentMeal = null;
+    let mealTotals = { gram: 0, kcal: 0, protein: 0, carb: 0, fiber: 0 };
+    let changed = false;
+
+    const addTotals = () => {
+      if (currentMeal !== null) {
+        const formatted = totalsToString(mealTotals);
+        if (newResults[currentMeal] !== formatted) {
+          newResults[currentMeal] = formatted;
+          changed = true;
+        }
+      }
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const normalized = normalizeInput(lines[i] || "");
+      if (mealKeywords.includes(normalized)) {
+        addTotals();
+        currentMeal = i;
+        mealTotals = { gram: 0, kcal: 0, protein: 0, carb: 0, fiber: 0 };
+      } else if (currentMeal !== null && lineValues[i]) {
+        const v = lineValues[i];
+        mealTotals.gram += v.gram;
+        mealTotals.kcal += v.kcal;
+        mealTotals.protein += v.protein;
+        mealTotals.carb += v.carb;
+        mealTotals.fiber += v.fiber;
+      }
+    }
+    addTotals();
+    if (changed) setResults(newResults);
+  }, [lineValues, text]);
+
   // Helper: get caret position (line, column)
   function getCaretLineCol(text, caretPos) {
     const lines = text.slice(0, caretPos).split("\n");
@@ -508,7 +546,12 @@ export default function WordEditorPage() {
           setText(record.foods || "");
           const dataLines = (record.data || "").split("\n");
           setResults(dataLines);
-          const lineVals = dataLines.map(parseResultLine);
+          const foodLines = (record.foods || "").split("\n");
+          const lineVals = dataLines.map((ln, idx) => {
+            const normalized = normalizeInput(foodLines[idx] || "");
+            if (["sabah", "ogle", "aksam"].includes(normalized)) return null;
+            return parseResultLine(ln);
+          });
           setLineValues(lineVals);
           const t = lineVals.reduce(
             (acc, v) => {
