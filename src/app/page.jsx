@@ -1,14 +1,39 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Button from "@mui/material/Button";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import Stack from "@mui/material/Stack";
 
+function slugify(text) {
+  const map = {
+    ç: "c",
+    ğ: "g",
+    ı: "i",
+    ö: "o",
+    ş: "s",
+    ü: "u",
+    Ç: "c",
+    Ğ: "g",
+    İ: "i",
+    Ö: "o",
+    Ş: "s",
+    Ü: "u",
+  };
+  return text
+    .split("")
+    .map((ch) => map[ch] || ch)
+    .join("")
+    .replace(/\s+/g, "-")
+    .toLowerCase();
+}
+
 export default function Home() {
   const [records, setRecords] = useState([]);
   const [username, setUsername] = useState("");
+  const router = useRouter();
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
   function fetchHistory() {
@@ -35,19 +60,23 @@ export default function Home() {
   function createRecord() {
     const recordName = prompt("Perhiz kaydının ismi");
     if (!recordName) return;
+    const slug = slugify(recordName);
     fetch(`${baseUrl}/api/records/postRecord`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         username,
-        name: recordName,
+        name: slug,
         foods: "",
         data: "",
         toplam: "",
       }),
       // credentials: "include", // Cookie göndermek isterseniz açabilirsiniz
     })
-      .then(() => fetchHistory())
+      .then(() => {
+        fetchHistory();
+        router.push(`/${username}/${encodeURIComponent(slug)}`);
+      })
       .catch(() => {});
   }
 

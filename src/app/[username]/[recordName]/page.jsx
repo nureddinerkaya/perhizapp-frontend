@@ -422,7 +422,10 @@ export default function WordEditorPage() {
       fetch(`${baseUrl}/api/records/getRecord/${params.username}`)
         .then(async (res) => {
           const text = await res.text();
-          if (!text) throw new Error("Kayıt bulunamadı veya boş yanıt.");
+          if (!text) {
+            setText("");
+            return;
+          }
           let arr;
           try {
             arr = JSON.parse(text);
@@ -437,7 +440,10 @@ export default function WordEditorPage() {
                   item.name === params.recordName
               )
             : null;
-          if (!record) throw new Error("Kayıt bulunamadı.");
+          if (!record) {
+            setText("");
+            return;
+          }
           setText(record.foods || record.data || "");
         })
         .catch((err) => {
