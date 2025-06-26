@@ -58,6 +58,44 @@ export default function WordEditorPage() {
     }));
   }
 
+  function parseResultLine(line) {
+    const m = line.match(
+      /(\d+)\s*g,\s*(\d+)\s*kcal,\s*(\d+)\s*g protein,\s*(\d+)\s*g karbonhidrat,\s*(\d+)\s*g lif/
+    );
+    if (!m) return null;
+    return {
+      gram: Number(m[1]),
+      kcal: Number(m[2]),
+      protein: Number(m[3]),
+      carb: Number(m[4]),
+      fiber: Number(m[5]),
+    };
+  }
+
+  function totalsToString(t) {
+    return `${roundNumber(t.gram)} g, ${roundNumber(t.kcal)} kcal, ${roundNumber(
+      t.protein
+    )} g protein, ${roundNumber(t.carb)} g karbonhidrat, ${roundNumber(
+      t.fiber
+    )} g lif`;
+  }
+
+  function parseTotalsString(str) {
+    const m =
+      str &&
+      str.match(
+        /(\d+)\s*g,\s*(\d+)\s*kcal,\s*(\d+)\s*g protein,\s*(\d+)\s*g karbonhidrat,\s*(\d+)\s*g lif/
+      );
+    if (!m) return { gram: 0, kcal: 0, protein: 0, carb: 0, fiber: 0 };
+    return {
+      gram: Number(m[1]),
+      kcal: Number(m[2]),
+      protein: Number(m[3]),
+      carb: Number(m[4]),
+      fiber: Number(m[5]),
+    };
+  }
+
   // Suggestion dropdown state
   const [suggestions, setSuggestions] = useState([]); // Array of food items
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -467,9 +505,34 @@ export default function WordEditorPage() {
             : null;
           if (!record) {
             setText("");
+            setResults([]);
+            setLineValues([]);
+            setTotals({ gram: 0, kcal: 0, protein: 0, carb: 0, fiber: 0 });
             return;
           }
-          setText(record.foods || record.data || "");
+          setText(record.foods || "");
+          const dataLines = (record.data || "").split("\n");
+          setResults(dataLines);
+          const lineVals = dataLines.map(parseResultLine);
+          setLineValues(lineVals);
+          if (record.toplam) {
+            setTotals(parseTotalsString(record.toplam));
+          } else {
+            const t = lineVals.reduce(
+              (acc, v) => {
+                if (!v) return acc;
+                return {
+                  gram: acc.gram + v.gram,
+                  kcal: acc.kcal + v.kcal,
+                  protein: acc.protein + v.protein,
+                  carb: acc.carb + v.carb,
+                  fiber: acc.fiber + v.fiber,
+                };
+              },
+              { gram: 0, kcal: 0, protein: 0, carb: 0, fiber: 0 }
+            );
+            setTotals(t);
+          }
         })
         .catch((err) => {
           setText("");
@@ -489,6 +552,8 @@ export default function WordEditorPage() {
       username: params.username,
       name: params.recordName,
       foods: text,
+      data: results.join("\n"),
+      toplam: totalsToString(totals),
     };
     fetch(`${baseUrl}/api/records/putRecord`, {
       method: "PUT",

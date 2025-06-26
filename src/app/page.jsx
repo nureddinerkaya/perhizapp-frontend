@@ -144,7 +144,9 @@ export default function Home() {
                     style={{ textDecoration: "none", flex: 1, minWidth: 180, maxWidth: 260 }}
                   >
                     <Paper elevation={2} className="p-6 hover:bg-blue-50 cursor-pointer text-center" style={{borderRadius: 16}}>
-                      <Typography variant="subtitle1" style={{fontSize: 18}}>{r.recordName || r.name}</Typography>
+                      <Typography variant="subtitle1" style={{fontSize: 18}}>
+                        {(r.recordName || r.name).replace(/-/g, " ")}
+                      </Typography>
                     </Paper>
                   </Link>
                 ))}
