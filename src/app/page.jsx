@@ -100,9 +100,15 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-50 to-blue-100">
       <header className="w-full max-w-6xl mx-auto flex items-center justify-between py-6 px-4">
-        <Typography variant="h4" className="font-bold text-blue-700">PerhizApp</Typography>
+        <Typography variant="h3" className="font-bold text-blue-700">PerhizApp</Typography>
         {username && (
-          <Button onClick={handleLogout} variant="outlined" color="error">
+          <Button
+            onClick={handleLogout}
+            variant="contained"
+            color="error"
+            size="large"
+            style={{ backgroundColor: "#fff", color: "#d32f2f" }}
+          >
             Çıkış Yap
           </Button>
         )}
