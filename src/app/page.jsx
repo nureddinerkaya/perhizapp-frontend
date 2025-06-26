@@ -44,7 +44,7 @@ export default function Home() {
 
   function fetchHistory() {
     if (!username || !password) return;
-    fetch(`${baseUrl}/api/records/getRecord/${encodeURIComponent(username)}`, {
+    fetch(`${baseUrl}/api/records/getRecord`, {
       headers: getAuthHeaders(),
     })
       .then((res) => res.json())

@@ -442,7 +442,7 @@ export default function WordEditorPage() {
     if (params?.username && params?.recordName) {
       setLoading(true);
       setError("");
-      fetch(`${baseUrl}/api/records/getRecord/${params.username}`, {
+      fetch(`${baseUrl}/api/records/getRecord`, {
         headers: getAuthHeaders(),
       })
         .then(async (res) => {
